@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build output
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# Env files (never commit secrets)
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+logs/
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# Test / coverage
+coverage/
+
+# Local data / uploads (temp ingestion staging, not committed)
+Backend/tmp/
+Backend/uploads/
+
+# Google service account keys (Drive ingestion) — never commit credentials
+Backend/secrets/
+*.service-account*.json
+
+# Redis / Postgres local volumes (if bind-mounted instead of named volumes)
+.docker-data/

@@ -1,0 +1,42 @@
+# OPTIONAL — an alternative to using cloud-hosted Postgres/Redis directly, not the required
+# path. Local dev and production both point Backend/.env's DATABASE_URL/REDIS_URL at real
+# cloud services (e.g. Neon for Postgres, Upstash for Redis) by default now — see
+# Backend/.env.example and README.md § Local setup. Only run this if you specifically prefer a
+# fully-local Postgres/Redis instead of the cloud ones for local development.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bebeyond-outreach-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-outreach}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-outreach}
+      POSTGRES_DB: ${POSTGRES_DB:-bebeyond_outreach}
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-outreach}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: bebeyond-outreach-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
+  redis_data:

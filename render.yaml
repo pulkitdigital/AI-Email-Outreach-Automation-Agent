@@ -1,0 +1,190 @@
+# Render Blueprint — Backend API (web service) + Daily Scheduler/queue worker (background
+# worker), both in the Singapore region, sharing one env var group so the Backend variables are
+# defined once, not twice.
+#
+# IMPORTANT — rootDir is the REPO ROOT for both services below, not Backend/. Backend depends on
+# `shared` (via the npm workspace "@bebeyond/shared" dependency), which lives one level up from
+# Backend/ at the repo root — if Render's root were set to Backend/ instead, the build could
+# never see `shared/` at all and would fail resolving @bebeyond/shared. Both buildCommands below
+# explicitly install root deps, build `shared` first, then build `Backend` — mirroring
+# vercel.json's same reasoning for the Frontend side.
+#
+# PRODUCTION DATABASE_URL / REDIS_URL — do NOT point these at the docker-compose.yml
+# Postgres/Redis containers (those are local-only, and docker-compose itself is now optional —
+# see its own top comment). Both local dev and production use the same cloud services:
+#   - DATABASE_URL: a Neon (https://neon.tech) Postgres connection string — pick a Neon region
+#     close to Singapore (e.g. Singapore itself, or the nearest available AWS/GCP region Neon
+#     offers) to keep Backend<->DB latency low. Include `?sslmode=require`; the `pg` driver
+#     parses this automatically.
+#   - REDIS_URL: the Upstash Redis connection string (Singapore region, already provisioned) —
+#     use the `rediss://` scheme (TLS); ioredis auto-detects TLS from that scheme.
+# Both are left as sync: false placeholders below specifically so you fill them in via the
+# Render dashboard, not by editing this file.
+#
+# STORAGE_PROVIDER is set to a fixed "r2" (not a placeholder) for both services below — Render's
+# web/worker services have ephemeral disk (wiped on every redeploy), so "local" storage would
+# silently lose every generated pitch deck the moment the service restarts. R2 is the only
+# correct choice in this deployment, not a per-environment preference.
+#
+# PUBLIC_APP_URL / ALLOWED_ORIGINS — both MUST be updated after first deploy, once real URLs
+# exist (see the callouts next to each below). Do not guess these ahead of time.
+
+envVarGroups:
+  - name: backend-env
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Render auto-assigns and injects PORT for web services at deploy time — leave this
+      # unset/blank in the dashboard for the web service; harmless (and unused) for the worker.
+      - key: PORT
+        sync: false
+      - key: LOG_LEVEL
+        value: info
+
+      # --- Database (PostgreSQL) — Neon, see the production note above ---
+      - key: POSTGRES_USER
+        sync: false
+      - key: POSTGRES_PASSWORD
+        sync: false
+      - key: POSTGRES_DB
+        sync: false
+      - key: POSTGRES_PORT
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+
+      # --- Redis (BullMQ) — Upstash (Singapore), see the production note above ---
+      - key: REDIS_PORT
+        sync: false
+      - key: REDIS_URL
+        sync: false
+
+      # --- AI Provider ---
+      - key: AI_PROVIDER
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        sync: false
+      - key: AI_CATEGORIZATION_MIN_CONFIDENCE
+        sync: false
+
+      # --- File Storage (Cloudflare R2) — STORAGE_PROVIDER fixed to r2, see the note above ---
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        sync: false
+      - key: R2_ENDPOINT
+        sync: false
+      - key: R2_PUBLIC_URL
+        sync: false
+      - key: STORAGE_PROVIDER
+        value: r2
+
+      # --- Google Drive ingestion (service account) ---
+      - key: GOOGLE_SERVICE_ACCOUNT_KEY_FILE
+        sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_KEY_JSON
+        sync: false
+      - key: MAX_UPLOAD_FILE_SIZE_MB
+        sync: false
+      - key: ZIP_MAX_RECURSION_DEPTH
+        sync: false
+
+      # --- Email provider switch + Brevo ---
+      - key: EMAIL_PROVIDER
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: BREVO_SENDER_EMAIL
+        sync: false
+      - key: BREVO_SENDER_NAME
+        sync: false
+      - key: BREVO_INBOUND_WEBHOOK_SECRET
+        sync: false
+      - key: BREVO_INBOUND_WEBHOOK_URL
+        sync: false
+      - key: BREVO_EVENTS_WEBHOOK_SECRET
+        sync: false
+      - key: EMAIL_SEND_RATE_LIMIT_MAX
+        sync: false
+      - key: EMAIL_SEND_RATE_LIMIT_DURATION_MS
+        sync: false
+
+      # --- Google Workspace / Gmail (stubbed, not required for Brevo-only operation) ---
+      - key: GMAIL_CLIENT_ID
+        sync: false
+      - key: GMAIL_CLIENT_SECRET
+        sync: false
+      - key: GMAIL_REDIRECT_URI
+        sync: false
+      - key: GMAIL_REFRESH_TOKEN
+        sync: false
+      - key: GMAIL_SENDER_EMAIL
+        sync: false
+      - key: GOOGLE_CLOUD_PROJECT_ID
+        sync: false
+      - key: GMAIL_PUBSUB_TOPIC
+        sync: false
+      - key: GMAIL_PUBSUB_SUBSCRIPTION
+        sync: false
+
+      # --- Sending limits / scheduler ---
+      - key: DAILY_EMAIL_LIMIT
+        sync: false
+      - key: SCHEDULER_TIMEZONE
+        sync: false
+      - key: SCHEDULER_CRON
+        sync: false
+
+      # --- Email Composer / unsubscribe links ---
+      # MUST UPDATE POST-DEPLOY: this Backend web service's own real Render URL (e.g.
+      # https://bebeyond-backend-api.onrender.com) — cannot be known until first deploy.
+      - key: PUBLIC_APP_URL
+        sync: false
+      - key: UNSUBSCRIBE_SECRET
+        sync: false
+
+      # --- CORS ---
+      # MUST UPDATE POST-DEPLOY: comma-separated origins allowed to call this API. Add the
+      # Frontend's real Vercel production URL here once it's deployed (e.g.
+      # https://your-app.vercel.app) — cannot be known ahead of time, and the API will reject
+      # the deployed Frontend's requests until this is set.
+      - key: ALLOWED_ORIGINS
+        sync: false
+
+services:
+  # Backend API (Express) — handles all /api/* routes the Frontend calls.
+  - type: web
+    name: bebeyond-backend-api
+    runtime: node
+    plan: starter
+    region: singapore
+    rootDir: .
+    buildCommand: npm install && npm run build:shared && npm run build --workspace=Backend
+    startCommand: npm run start --workspace=Backend
+    healthCheckPath: /health
+    envVars:
+      - fromGroup: backend-env
+
+  # Daily Scheduler + BullMQ queue workers (ingestion, categorization, deck-generation,
+  # sending, scheduler) — Backend/package.json's existing "start:worker" script
+  # (node dist/queue/startWorkers.js), already built for this exact purpose since Phase 4/5.
+  - type: worker
+    name: bebeyond-backend-worker
+    runtime: node
+    plan: starter
+    region: singapore
+    rootDir: .
+    buildCommand: npm install && npm run build:shared && npm run build --workspace=Backend
+    startCommand: npm run start:worker --workspace=Backend
+    envVars:
+      - fromGroup: backend-env
