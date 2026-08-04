@@ -1,0 +1,39 @@
+{
+  "name": "bebeyond-outreach-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "AI Email Outreach Automation Agent for BeBeyond Digital Solutions",
+  "workspaces": [
+    "Backend",
+    "Frontend",
+    "shared"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "build:shared": "npm run build -w shared",
+    "dev:backend": "npm run dev -w Backend",
+    "dev:worker": "npm run dev:worker -w Backend",
+    "dev:dashboard": "npm run dev -w Frontend",
+    "db:migrate": "npm run db:migrate -w Backend",
+    "test:backend": "npm run test -w Backend",
+    "docker:up": "docker compose --env-file Backend/.env up -d",
+    "docker:down": "docker compose down"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@typescript-eslint/eslint-plugin": "^8.19.0",
+    "@typescript-eslint/parser": "^8.19.0",
+    "eslint": "^9.17.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.19.0"
+  }
+}

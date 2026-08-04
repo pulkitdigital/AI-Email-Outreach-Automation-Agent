@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(node -e ' *)",
+      "Bash(npx tsx *)",
+      "Bash(curl -sS -i http://localhost:4000/health)",
+      "Bash(powershell -Command \"Get-Process -Id 18792 | Select-Object Id,ProcessName,Path\")",
+      "Bash(curl -sS -i http://localhost:3000)",
+      "Bash(powershell -Command \"Get-CimInstance Win32_Process -Filter 'ProcessId=18792' | Select-Object CommandLine\")",
+      "Bash(powershell -Command \"Stop-Process -Id 18792 -Force\")",
+      "Bash(powershell -Command \"Get-NetTCPConnection -LocalPort 3001 -State Listen | Select-Object OwningProcess\")",
+      "Bash(powershell -Command \"Stop-Process -Id 7504 -Force\")",
+      "Bash(curl -sS -X POST http://localhost:4000/api/categorization/recategorize -H \"Content-Type: application/json\" -d '{\"status\":\"needs_review\"}')",
+      "Bash(curl -sS -X POST http://localhost:4000/api/scheduler/run-now -H \"Content-Type: application/json\")",
+      "Bash(curl -sS http://localhost:4000/health)",
+      "Bash(npx tsc *)",
+      "Bash(npx vitest *)",
+      "Bash(curl -sS -X POST \"http://localhost:4000/api/decks/leads/f40b7e3a-86f5-4b61-9ad7-4cee4e796679/regenerate\" -H \"Content-Type: application/json\")",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Windows\\\\Fonts\" | Where-Object { $_.Name -match \"Bricolage|PublicSans|Public Sans\" } | Select-Object Name)",
+      "Bash(curl -sS -m 3 http://localhost:4000/health)",
+      "Bash(curl -sS -m 3 http://localhost:3000)",
+      "Bash(curl -sS -m 5 http://localhost:4000/health)",
+      "Bash(sleep 3 && grep -i \"workers started\\\\|error\" \"/c/Users/SYS2/AppData/Local/Temp/claude/D--Aditya-BBDS-AI-Email-Outreach-Automation-Agent-main/85da2691-c430-4063-af1e-26b3e34dee88/tasks/bjunjf0jc.output\" 2>&1 | tail -10)",
+      "Bash(grep -a -o \"/BaseFont[^/]\\\\{0,60\\\\}\" test-deck-fonts.pdf)",
+      "Bash(curl -sS -X PATCH http://localhost:4000/api/leads/b01f4787-9358-4695-be6a-0148be66a34a -H 'Content-Type: application/json' -d '{\"categoryId\":\"814dfd3b-9a95-4978-84c9-7383579dec76\"}')",
+      "Bash(powershell -Command \"Get-CimInstance Win32_Process -Filter \\\\\"Name='node.exe'\\\\\" | Select-Object ProcessId,CommandLine | Format-List\")",
+      "Bash(powershell -Command \"Stop-Process -Id 20276,12256,11280,11072,9736,16484,15304,25660 -Force -ErrorAction SilentlyContinue\")",
+      "Bash(echo \"exit: $?\")",
+      "Bash(sleep 3 && grep -i \"workers started\\\\|error\" \"/c/Users/SYS2/AppData/Local/Temp/claude/D--Aditya-BBDS-AI-Email-Outreach-Automation-Agent-main/67a45286-3e83-4909-9bdb-885f02207d47/tasks/bijf3sjs2.output\" 2>&1 | tail -10)",
+      "Bash(curl -sS -m 3 http://localhost:3000 -o /dev/null -w \"%{http_code}\\\\n\")"
+    ]
+  }
+}
