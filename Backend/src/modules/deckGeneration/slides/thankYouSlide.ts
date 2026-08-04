@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { BRAND_COLORS, BRAND_CONTACT, BRAND_FONT_BODY, BRAND_FONT_HEADING } from '../brand.js';
+=======
+import { BRAND_COLORS, BRAND_CONTACT, BRAND_FONT } from '../brand.js';
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
 import type { DeckContext } from '../types.js';
 import type { Slide } from './cardHelpers.js';
 
@@ -11,7 +15,11 @@ export function addThankYouSlide(slide: Slide, ctx: DeckContext): void {
       { text: 'Thank ', options: { color: BRAND_COLORS.teal, bold: true } },
       { text: 'You', options: { color: BRAND_COLORS.orange, bold: true } },
     ],
+<<<<<<< HEAD
     { x: 1.5, y: 1.1, w: 10.33, h: 1.1, fontSize: 54, fontFace: BRAND_FONT_HEADING, align: 'center' },
+=======
+    { x: 1.5, y: 1.1, w: 10.33, h: 1.1, fontSize: 54, fontFace: BRAND_FONT, align: 'center' },
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
   );
 
   slide.addText(`We look forward to partnering with ${ctx.companyName}.`, {
@@ -22,7 +30,11 @@ export function addThankYouSlide(slide: Slide, ctx: DeckContext): void {
     fontSize: 16,
     italic: true,
     color: BRAND_COLORS.teal,
+<<<<<<< HEAD
     fontFace: BRAND_FONT_BODY,
+=======
+    fontFace: BRAND_FONT,
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
     align: 'center',
   });
 
@@ -32,7 +44,11 @@ export function addThankYouSlide(slide: Slide, ctx: DeckContext): void {
       { text: 'Beyond', options: { color: BRAND_COLORS.teal, bold: true } },
       { text: ' Digital Solutions', options: { color: BRAND_COLORS.teal, bold: true } },
     ],
+<<<<<<< HEAD
     { x: 1.5, y: 2.95, w: 10.33, h: 0.6, fontSize: 24, fontFace: BRAND_FONT_HEADING, align: 'center' },
+=======
+    { x: 1.5, y: 2.95, w: 10.33, h: 0.6, fontSize: 24, fontFace: BRAND_FONT, align: 'center' },
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
   );
   slide.addText(BRAND_CONTACT.tagline, {
     x: 1.5,
@@ -42,7 +58,11 @@ export function addThankYouSlide(slide: Slide, ctx: DeckContext): void {
     fontSize: 17,
     bold: true,
     color: BRAND_COLORS.orange,
+<<<<<<< HEAD
     fontFace: BRAND_FONT_HEADING,
+=======
+    fontFace: BRAND_FONT,
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
     align: 'center',
   });
 
@@ -55,7 +75,11 @@ export function addThankYouSlide(slide: Slide, ctx: DeckContext): void {
     fontSize: 13,
     bold: true,
     color: BRAND_COLORS.teal,
+<<<<<<< HEAD
     fontFace: BRAND_FONT_BODY,
+=======
+    fontFace: BRAND_FONT,
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
   });
   slide.addText(`✉️  ${BRAND_CONTACT.email}`, {
     x: 6.8,
@@ -65,7 +89,11 @@ export function addThankYouSlide(slide: Slide, ctx: DeckContext): void {
     fontSize: 13,
     bold: true,
     color: BRAND_COLORS.teal,
+<<<<<<< HEAD
     fontFace: BRAND_FONT_BODY,
+=======
+    fontFace: BRAND_FONT,
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
   });
   slide.addText(`📍  ${BRAND_CONTACT.address}`, {
     x: 2.0,
@@ -75,6 +103,10 @@ export function addThankYouSlide(slide: Slide, ctx: DeckContext): void {
     fontSize: 13,
     bold: true,
     color: BRAND_COLORS.orange,
+<<<<<<< HEAD
     fontFace: BRAND_FONT_BODY,
+=======
+    fontFace: BRAND_FONT,
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
   });
 }

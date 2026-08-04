@@ -53,6 +53,7 @@ export class BrevoProvider implements EmailProvider {
         textContent: params.text,
         // Cross-references this send back to sent_emails_log in Brevo's own dashboard/logs.
         tags: [params.internalReferenceId],
+<<<<<<< HEAD
         // Brevo's SDK field is `attachment` (singular) and takes base64 content + a filename —
         // no separate content-type param; Brevo infers MIME type server-side from the filename's
         // extension (see its own supported-extensions list, which includes pptx). Previously
@@ -62,6 +63,8 @@ export class BrevoProvider implements EmailProvider {
           name: a.filename,
           content: Buffer.isBuffer(a.content) ? a.content.toString('base64') : a.content,
         })),
+=======
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
       });
 
       if (!result.messageId) {

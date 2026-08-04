@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { BRAND_COLORS, BRAND_FONT_BODY, BRAND_FONT_HEADING } from '../brand.js';
+=======
+import { BRAND_COLORS, BRAND_FONT } from '../brand.js';
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
 import { OUR_STORY } from '../staticContent.js';
 import { addSlideTitle, type Slide } from './cardHelpers.js';
 
@@ -66,7 +70,11 @@ export function addOurStorySlide(slide: Slide): void {
       fontSize: 13,
       bold: true,
       color: accent,
+<<<<<<< HEAD
       fontFace: BRAND_FONT_HEADING,
+=======
+      fontFace: BRAND_FONT,
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
       valign: 'middle',
     });
     slide.addText(step.body, {
@@ -76,7 +84,11 @@ export function addOurStorySlide(slide: Slide): void {
       h: cardH - 0.9,
       fontSize: 10.5,
       color: BRAND_COLORS.textDark,
+<<<<<<< HEAD
       fontFace: BRAND_FONT_BODY,
+=======
+      fontFace: BRAND_FONT,
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
       valign: 'top',
       lineSpacingMultiple: 1.2,
     });

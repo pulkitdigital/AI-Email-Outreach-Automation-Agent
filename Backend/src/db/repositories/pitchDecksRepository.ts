@@ -11,9 +11,12 @@ export interface PitchDeckRecord {
   templateVersion: string | null;
   fileKey: string | null;
   fileUrl: string | null;
+<<<<<<< HEAD
   /** The .pdf rendering used for outreach-email attachments (converted from the .pptx above via LibreOffice — see pptxToPdf.ts). Null until conversion completes. */
   pdfFileKey: string | null;
   pdfFileUrl: string | null;
+=======
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
   createdAt: Date;
   updatedAt: Date;
 }
@@ -23,7 +26,10 @@ const PITCH_DECK_COLUMNS = `
   generation_status AS "generationStatus", generation_error AS "generationError",
   generated_by AS "generatedBy", template_version AS "templateVersion",
   file_key AS "fileKey", file_url AS "fileUrl",
+<<<<<<< HEAD
   pdf_file_key AS "pdfFileKey", pdf_file_url AS "pdfFileUrl",
+=======
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
   created_at AS "createdAt", updated_at AS "updatedAt"
 `;
 
@@ -72,7 +78,10 @@ export async function listFailedPitchDecks(limit: number): Promise<ListFailedPit
             p.generation_status AS "generationStatus", p.generation_error AS "generationError",
             p.generated_by AS "generatedBy", p.template_version AS "templateVersion",
             p.file_key AS "fileKey", p.file_url AS "fileUrl",
+<<<<<<< HEAD
             p.pdf_file_key AS "pdfFileKey", p.pdf_file_url AS "pdfFileUrl",
+=======
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
             p.created_at AS "createdAt", p.updated_at AS "updatedAt",
             l.email AS "leadEmail", l.company_name AS "companyName",
             COUNT(*) OVER()::text AS "totalCount"
@@ -109,8 +118,11 @@ export interface UpdatePitchDeckStatusInput {
   generatedBy?: string | null;
   fileKey?: string | null;
   fileUrl?: string | null;
+<<<<<<< HEAD
   pdfFileKey?: string | null;
   pdfFileUrl?: string | null;
+=======
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
 }
 
 export async function updatePitchDeckStatus(
@@ -123,9 +135,13 @@ export async function updatePitchDeckStatus(
        generation_error = $3,
        generated_by = COALESCE($4, generated_by),
        file_key = COALESCE($5, file_key),
+<<<<<<< HEAD
        file_url = COALESCE($6, file_url),
        pdf_file_key = COALESCE($7, pdf_file_key),
        pdf_file_url = COALESCE($8, pdf_file_url)
+=======
+       file_url = COALESCE($6, file_url)
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
      WHERE id = $1
      RETURNING ${PITCH_DECK_COLUMNS}`,
     [
@@ -135,8 +151,11 @@ export async function updatePitchDeckStatus(
       patch.generatedBy ?? null,
       patch.fileKey ?? null,
       patch.fileUrl ?? null,
+<<<<<<< HEAD
       patch.pdfFileKey ?? null,
       patch.pdfFileUrl ?? null,
+=======
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
     ],
   );
   return (rows[0] as PitchDeckRecord | undefined) ?? null;

@@ -13,10 +13,13 @@ import { listSentEmailLogsForLead } from '../db/repositories/sentEmailsLogReposi
 import { confirmLead } from '../modules/leads/leadReviewService.js';
 import { LeadReviewPreconditionError } from '../modules/leads/errors.js';
 import type { MergeableLeadFields } from '../modules/ingestion/normalize.js';
+<<<<<<< HEAD
 import {
   assignCategoryManually,
   CategoryNotFoundError,
 } from '../modules/categorization/categorizationService.js';
+=======
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
 
 export const leadsRouter = Router();
 
@@ -134,6 +137,7 @@ leadsRouter.get('/:id', async (req, res) => {
   }
 });
 
+<<<<<<< HEAD
 /**
  * PATCH /api/leads/:id — inline edit of the free-text profile fields (dashboard needs-review
  * queue), and/or a manual category assignment via `categoryId` in the body. The two are
@@ -142,6 +146,9 @@ leadsRouter.get('/:id', async (req, res) => {
  * advancement and deck-generation-triggering behavior as automatic categorization, just with
  * categorization_method = 'manual' and no confidence score.
  */
+=======
+/** PATCH /api/leads/:id — inline edit of the free-text profile fields (dashboard needs-review queue). */
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
 leadsRouter.patch('/:id', async (req, res) => {
   try {
     const lead = await getLeadById(req.params.id);
@@ -150,6 +157,7 @@ leadsRouter.patch('/:id', async (req, res) => {
       return;
     }
 
+<<<<<<< HEAD
     const fieldPatch = parsePatch(req.body);
     if (Object.keys(fieldPatch).length > 0) {
       await updateLeadFields(req.params.id, fieldPatch);
@@ -173,6 +181,9 @@ leadsRouter.patch('/:id', async (req, res) => {
     }
 
     const updated = await getLeadById(req.params.id);
+=======
+    const updated = await updateLeadFields(req.params.id, parsePatch(req.body));
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
     res.json(updated);
   } catch (err) {
     console.error(`[leads-route] failed to update lead ${req.params.id}:`, err);

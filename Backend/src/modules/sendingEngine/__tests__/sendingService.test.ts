@@ -95,8 +95,11 @@ const readyDeck = {
   generationStatus: 'ready',
   fileKey: 'pitch-decks/lead-1/deck-1.pptx',
   fileUrl: null,
+<<<<<<< HEAD
   pdfFileKey: 'pitch-decks/lead-1/deck-1.pdf',
   pdfFileUrl: null,
+=======
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
 };
 
 beforeEach(() => {
@@ -172,11 +175,19 @@ describe('sendSequenceEmail — successful sends', () => {
         to: 'lead1@example.com',
         subject: composed.subject,
         attachments: expect.arrayContaining([
+<<<<<<< HEAD
           expect.objectContaining({ contentType: 'application/pdf' }),
         ]),
       }),
     );
     expect(getObjectMock).toHaveBeenCalledWith('pitch-decks/lead-1/deck-1.pdf');
+=======
+          expect.objectContaining({ contentType: expect.stringContaining('presentationml') }),
+        ]),
+      }),
+    );
+    expect(getObjectMock).toHaveBeenCalledWith('pitch-decks/lead-1/deck-1.pptx');
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
     expect(markSendResultMock).toHaveBeenCalledWith(
       'log-1',
       expect.objectContaining({ status: 'sent', externalMessageId: 'ext-1' }),

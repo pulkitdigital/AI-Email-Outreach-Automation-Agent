@@ -9,6 +9,7 @@ export class DeckGenerationPreconditionError extends Error {
     this.name = 'DeckGenerationPreconditionError';
   }
 }
+<<<<<<< HEAD
 
 /**
  * Thrown by pptxToPdf.ts when the .pptx -> .pdf conversion step fails for any reason
@@ -26,3 +27,5 @@ export class DeckPdfConversionError extends Error {
     this.name = 'DeckPdfConversionError';
   }
 }
+=======
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7

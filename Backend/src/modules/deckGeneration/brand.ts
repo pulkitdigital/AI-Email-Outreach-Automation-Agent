@@ -22,6 +22,7 @@ export const BRAND_COLORS = {
   white: 'FFFFFF',
 } as const;
 
+<<<<<<< HEAD
 /**
  * Heading font (slide titles, section/card headers) and body font (paragraphs, bullet points,
  * service descriptions) per the 2026-08-04 brand update.
@@ -40,6 +41,9 @@ export const BRAND_COLORS = {
  */
 export const BRAND_FONT_HEADING = 'Bricolage Grotesque';
 export const BRAND_FONT_BODY = 'Public Sans';
+=======
+export const BRAND_FONT = 'Arial';
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
 
 export const BRAND_CONTACT = {
   companyName: 'BeBeyond Digital Solutions',

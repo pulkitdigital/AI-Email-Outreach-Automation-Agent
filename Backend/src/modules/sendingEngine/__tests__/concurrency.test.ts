@@ -106,8 +106,11 @@ vi.mock('../../../db/repositories/pitchDecksRepository.js', () => ({
     generationStatus: 'ready',
     fileKey: 'pitch-decks/lead-1/deck-1.pptx',
     fileUrl: null,
+<<<<<<< HEAD
     pdfFileKey: 'pitch-decks/lead-1/deck-1.pdf',
     pdfFileUrl: null,
+=======
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
   })),
 }));
 

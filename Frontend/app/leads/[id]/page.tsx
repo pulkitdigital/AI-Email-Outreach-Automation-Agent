@@ -10,7 +10,10 @@ import {
   useRecategorizeLead,
   useRegenerateDeck,
   useSendNow,
+<<<<<<< HEAD
   useCategories,
+=======
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
 } from '@/lib/hooks';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,6 +21,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import {
+<<<<<<< HEAD
   Select,
   SelectContent,
   SelectItem,
@@ -25,6 +29,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+=======
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
   Table,
   TableBody,
   TableCell,
@@ -57,7 +63,10 @@ export default function LeadDetailPage() {
   const leadId = params.id;
 
   const { data: lead, isLoading, isError, error } = useLead(leadId);
+<<<<<<< HEAD
   const { data: categories } = useCategories();
+=======
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
   const updateLead = useUpdateLead(leadId);
   const confirmLead = useConfirmLead(leadId);
   const recategorize = useRecategorizeLead();
@@ -65,12 +74,18 @@ export default function LeadDetailPage() {
   const sendNow = useSendNow();
 
   const [fields, setFields] = useState<Record<string, string>>({});
+<<<<<<< HEAD
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
+=======
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
 
   useEffect(() => {
     if (!lead) return;
     setFields(Object.fromEntries(EDITABLE_FIELDS.map((f) => [f.key, lead[f.key] ?? ''])));
+<<<<<<< HEAD
     setSelectedCategoryId(lead.categoryId ?? '');
+=======
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
   }, [lead]);
 
   if (isLoading) {
@@ -103,6 +118,7 @@ export default function LeadDetailPage() {
     });
   }
 
+<<<<<<< HEAD
   function handleSaveCategory() {
     if (!selectedCategoryId) {
       toast.error('Pick a category first');
@@ -118,6 +134,8 @@ export default function LeadDetailPage() {
     );
   }
 
+=======
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
   function handleRecategorize() {
     recategorize.mutate(leadId, {
       onSuccess: () => toast.success('Recategorization queued'),
@@ -187,6 +205,7 @@ export default function LeadDetailPage() {
               </div>
             ))}
           </div>
+<<<<<<< HEAD
           <div className="space-y-1.5">
             <Label htmlFor="category">
               Category{lead.categorizationMethod ? ` (${titleCase(lead.categorizationMethod)})` : ''}
@@ -214,6 +233,8 @@ export default function LeadDetailPage() {
             </div>
           </div>
 
+=======
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
           <div className="flex gap-2">
             {lead.status === 'needs_review' ? (
               <Button onClick={handleConfirm} disabled={confirmLead.isPending}>

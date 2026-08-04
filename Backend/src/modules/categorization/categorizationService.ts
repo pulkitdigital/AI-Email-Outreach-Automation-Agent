@@ -1,6 +1,10 @@
 import type { CategoryMatch, LeadStatus } from '@bebeyond/shared';
 import { env } from '../../config/env.js';
+<<<<<<< HEAD
 import { getCategoryById, listActiveCategories } from '../../db/repositories/categoriesRepository.js';
+=======
+import { listActiveCategories } from '../../db/repositories/categoriesRepository.js';
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
 import { listActiveCategorizationRules } from '../../db/repositories/categorizationRulesRepository.js';
 import {
   replaceSecondaryCategories,
@@ -187,6 +191,7 @@ export async function markCategorizationFailed(leadId: string): Promise<void> {
     reviewReason: 'ai_categorization_failed',
   });
 }
+<<<<<<< HEAD
 
 export class CategoryNotFoundError extends Error {
   constructor(categoryId: string) {
@@ -231,3 +236,5 @@ export async function assignCategoryManually(leadId: string, categoryId: string)
 
   await maybeTriggerDeckGeneration(leadId, lead.categoryId, categoryId);
 }
+=======
+>>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
