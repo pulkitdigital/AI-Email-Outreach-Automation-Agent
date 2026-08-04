@@ -15,6 +15,12 @@ import { z } from 'zod';
  */
 loadDotenv({ path: path.resolve(fileURLToPath(import.meta.url), '../../../.env') });
 
+// TEMPORARY DEBUG LOG — remove after inspecting output.
+console.log(
+  'DEBUG_DATABASE_URL:',
+  (process.env.DATABASE_URL ?? '(unset)').replace(/:([^:@/]+)@/, ':***@'),
+);
+
 /**
  * Fail fast on a missing/invalid env var at startup rather than failing silently deep inside
  * a queue worker later. Every consumer imports `env` from here instead of touching

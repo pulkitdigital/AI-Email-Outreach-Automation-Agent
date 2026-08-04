@@ -1,3 +1,12 @@
+// Force IPv4-first DNS resolution. On networks with broken/local-only IPv6 (common on many
+// Indian home routers/ISPs), Node's default "Happy Eyeballs" behavior tries IPv4 and IPv6 in
+// parallel and can hang waiting on a non-routable IPv6 candidate even though IPv4 alone works
+// fine (confirmed via `Test-NetConnection ... -Port 5432` succeeding while the app's pg pool
+// timed out). Must run before any module that opens a socket (pg, ioredis) is imported.
+
+import dns from 'node:dns';
+dns.setDefaultResultOrder('ipv4first');
+
 import express from 'express';
 import cors from 'cors';
 import { env } from './config/env.js';
@@ -20,6 +29,7 @@ import { webhooksRouter } from './routes/webhooks.js';
 
 // Fail loudly at boot if EMAIL_PROVIDER is misconfigured (e.g. 'gmail' before it's wired up),
 // rather than crashing unexpectedly deep in a send job later. See providers/email/index.ts.
+
 try {
   assertEmailProviderReady();
 } catch (err) {
