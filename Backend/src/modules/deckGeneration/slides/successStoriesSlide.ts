@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 import { BRAND_COLORS, BRAND_FONT_BODY } from '../brand.js';
-=======
-import { BRAND_COLORS, BRAND_FONT } from '../brand.js';
->>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
 import { SUCCESS_STORY_CLIENTS } from '../staticContent.js';
 import { addSlideTitle, type Slide } from './cardHelpers.js';
 
@@ -47,11 +43,7 @@ export function addSuccessStoriesSlide(slide: Slide): void {
       fontSize: 11,
       bold: true,
       color: BRAND_COLORS.textDark,
-<<<<<<< HEAD
       fontFace: BRAND_FONT_BODY,
-=======
-      fontFace: BRAND_FONT,
->>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
       align: 'center',
       valign: 'middle',
     });

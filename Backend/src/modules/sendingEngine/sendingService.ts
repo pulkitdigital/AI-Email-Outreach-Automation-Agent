@@ -41,7 +41,6 @@ const ELIGIBLE_STATUSES_BY_STAGE: Record<SendableStage, LeadStatus[]> = {
   final: ['in_sequence'],
 };
 
-<<<<<<< HEAD
 const DECK_PDF_CONTENT_TYPE = 'application/pdf';
 
 /**
@@ -61,19 +60,6 @@ function assertDeckReady(
       `Cannot send 'new' stage to lead ${leadId}: no ready pitch deck PDF found ` +
         `(status is '${deck?.generationStatus ?? 'none'}', pdfFileKey is ` +
         `'${deck?.pdfFileKey ?? 'null'}' — regenerate the deck if it predates PDF conversion)`,
-=======
-const DECK_CONTENT_TYPE =
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation';
-
-function assertDeckReady(
-  leadId: string,
-  deck: PitchDeckRecord | null,
-): asserts deck is PitchDeckRecord & { fileKey: string } {
-  if (!deck || deck.generationStatus !== 'ready' || !deck.fileKey) {
-    throw new SendPreconditionError(
-      `Cannot send 'new' stage to lead ${leadId}: no ready pitch deck found ` +
-        `(status is '${deck?.generationStatus ?? 'none'}')`,
->>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
     );
   }
 }
@@ -116,11 +102,7 @@ export async function sendSequenceEmail(leadId: string, stage: SendableStage): P
     throw new SendPreconditionError(`Cannot send: lead ${leadId} has no primary category yet`);
   }
 
-<<<<<<< HEAD
   let deck: (PitchDeckRecord & { pdfFileKey: string }) | null = null;
-=======
-  let deck: (PitchDeckRecord & { fileKey: string }) | null = null;
->>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
   if (stage === 'new') {
     const latestDeck = await getLatestPitchDeckForLead(leadId);
     assertDeckReady(leadId, latestDeck);
@@ -199,21 +181,12 @@ export async function sendSequenceEmail(leadId: string, stage: SendableStage): P
 
   let attachments: EmailAttachment[] | undefined;
   if (stage === 'new' && deck) {
-<<<<<<< HEAD
     const deckBytes = await getStorageProvider().getObject(deck.pdfFileKey);
     attachments = [
       {
         filename: `${(lead.companyName ?? 'pitch-deck').replace(/[^a-z0-9]+/gi, '-')}.pdf`,
         content: deckBytes,
         contentType: DECK_PDF_CONTENT_TYPE,
-=======
-    const deckBytes = await getStorageProvider().getObject(deck.fileKey);
-    attachments = [
-      {
-        filename: `${(lead.companyName ?? 'pitch-deck').replace(/[^a-z0-9]+/gi, '-')}.pptx`,
-        content: deckBytes,
-        contentType: DECK_CONTENT_TYPE,
->>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
       },
     ];
   }

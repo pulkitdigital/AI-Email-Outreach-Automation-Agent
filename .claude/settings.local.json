@@ -29,7 +29,15 @@
       "Bash(powershell -Command \"Stop-Process -Id 20276,12256,11280,11072,9736,16484,15304,25660 -Force -ErrorAction SilentlyContinue\")",
       "Bash(echo \"exit: $?\")",
       "Bash(sleep 3 && grep -i \"workers started\\\\|error\" \"/c/Users/SYS2/AppData/Local/Temp/claude/D--Aditya-BBDS-AI-Email-Outreach-Automation-Agent-main/67a45286-3e83-4909-9bdb-885f02207d47/tasks/bijf3sjs2.output\" 2>&1 | tail -10)",
-      "Bash(curl -sS -m 3 http://localhost:3000 -o /dev/null -w \"%{http_code}\\\\n\")"
+      "Bash(curl -sS -m 3 http://localhost:3000 -o /dev/null -w \"%{http_code}\\\\n\")",
+      "Bash(git diff *)",
+      "Bash(mkdir -p \"/c/Users/SYS2/AppData/Local/Temp/claude/D--Aditya-BBDS-AI-Email-Outreach-Automation-Agent-main/a0dd5650-efc3-46f0-a732-193060633cb7/scratchpad\")",
+      "Read(//c/Users/SYS2/AppData/Local/Temp/claude/D--Aditya-BBDS-AI-Email-Outreach-Automation-Agent-main/a0dd5650-efc3-46f0-a732-193060633cb7/scratchpad/**)",
+      "Bash(git checkout *)",
+      "Bash(grep -rl *)",
+      "Bash(echo \"backend pid: $!\")",
+      "Bash(echo \"worker pid: $!\")",
+      "Bash(curl -s http://localhost:4000/health)"
     ]
   }
 }

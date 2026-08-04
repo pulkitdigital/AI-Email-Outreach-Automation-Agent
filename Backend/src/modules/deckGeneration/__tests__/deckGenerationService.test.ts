@@ -41,14 +41,11 @@ vi.mock('../deckBuilder.js', () => ({
   DECK_TEMPLATE_VERSION: 'v1',
 }));
 
-<<<<<<< HEAD
 const convertPptxToPdfMock = vi.fn();
 vi.mock('../pptxToPdf.js', () => ({
   convertPptxToPdf: convertPptxToPdfMock,
 }));
 
-=======
->>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
 const { triggerDeckGeneration, generateDeckForLead, markDeckGenerationFailed } =
   await import('../deckGenerationService.js');
 const { DeckGenerationPreconditionError } = await import('../errors.js');
@@ -75,10 +72,7 @@ beforeEach(() => {
   putObjectMock.mockReset();
   getStorageProviderMock.mockClear();
   buildDeckForLeadMock.mockReset();
-<<<<<<< HEAD
   convertPptxToPdfMock.mockReset().mockResolvedValue(Buffer.from('pdf-bytes'));
-=======
->>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
 });
 
 describe('triggerDeckGeneration', () => {
@@ -127,30 +121,23 @@ describe('generateDeckForLead', () => {
       expect.any(Buffer),
       expect.stringContaining('presentationml'),
     );
-<<<<<<< HEAD
     expect(convertPptxToPdfMock).toHaveBeenCalledWith(expect.any(Buffer));
     expect(putObjectMock).toHaveBeenCalledWith(
       'pitch-decks/lead-1/deck-1.pdf',
       expect.any(Buffer),
       'application/pdf',
     );
-=======
->>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
     expect(updatePitchDeckStatusMock).toHaveBeenCalledWith('deck-1', {
       status: 'generating',
       generationError: null,
     });
     expect(updatePitchDeckStatusMock).toHaveBeenCalledWith(
       'deck-1',
-<<<<<<< HEAD
       expect.objectContaining({
         status: 'ready',
         fileKey: 'pitch-decks/lead-1/deck-1.pptx',
         pdfFileKey: 'pitch-decks/lead-1/deck-1.pdf',
       }),
-=======
-      expect.objectContaining({ status: 'ready', fileKey: 'pitch-decks/lead-1/deck-1.pptx' }),
->>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
     );
     expect(updateLeadStatusMock).toHaveBeenCalledWith('lead-1', 'deck_generated');
   });
@@ -168,10 +155,7 @@ describe('generateDeckForLead', () => {
       'deck-1',
       expect.objectContaining({
         fileUrl: 'https://cdn.example.com/pitch-decks/lead-1/deck-1.pptx',
-<<<<<<< HEAD
         pdfFileUrl: 'https://cdn.example.com/pitch-decks/lead-1/deck-1.pdf',
-=======
->>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
       }),
     );
   });
@@ -186,14 +170,10 @@ describe('generateDeckForLead', () => {
 
     expect(updatePitchDeckStatusMock).toHaveBeenCalledWith(
       'deck-1',
-<<<<<<< HEAD
       expect.objectContaining({
         fileUrl: '/api/decks/deck-1/download',
         pdfFileUrl: '/api/decks/deck-1/download?format=pdf',
       }),
-=======
-      expect.objectContaining({ fileUrl: '/api/decks/deck-1/download' }),
->>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
     );
   });
 
@@ -223,7 +203,6 @@ describe('generateDeckForLead', () => {
     expect(updateLeadStatusMock).not.toHaveBeenCalled();
   });
 
-<<<<<<< HEAD
   it('marks the pitch deck failed and rethrows when PDF conversion fails, without touching lead status or advancing past pptx upload', async () => {
     getLeadByIdMock.mockResolvedValue(baseLead());
     getPitchDeckByIdMock.mockResolvedValue({ id: 'deck-1' });
@@ -254,8 +233,6 @@ describe('generateDeckForLead', () => {
     expect(updateLeadStatusMock).not.toHaveBeenCalled();
   });
 
-=======
->>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
   it('throws DeckGenerationPreconditionError without touching the pitch deck if the lead lost its category', async () => {
     getLeadByIdMock.mockResolvedValue(baseLead({ categoryId: null }));
 

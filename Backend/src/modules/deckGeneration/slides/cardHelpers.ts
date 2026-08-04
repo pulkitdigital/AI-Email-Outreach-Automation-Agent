@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 import { BRAND_COLORS, BRAND_FONT_BODY, BRAND_FONT_HEADING } from '../brand.js';
-=======
-import { BRAND_COLORS, BRAND_FONT } from '../brand.js';
->>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
 import type { Slide } from '../pptxgenLoader.js';
 
 export type { Slide };
@@ -16,11 +12,7 @@ export function addSlideTitle(
   const { x = 0.6, y = 0.4, fontSize = 32 } = opts;
   slide.addText(
     parts.map((p) => ({ text: p.text, options: { color: p.color, bold: true } })),
-<<<<<<< HEAD
     { x, y, w: 10, h: 0.8, fontSize, fontFace: BRAND_FONT_HEADING, align: 'left' },
-=======
-    { x, y, w: 10, h: 0.8, fontSize, fontFace: BRAND_FONT, align: 'left' },
->>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
   );
   slide.addShape('rect', {
     x,
@@ -88,11 +80,7 @@ export function drawIconCard(
     bold: true,
     align: 'center',
     color: accentColor,
-<<<<<<< HEAD
     fontFace: BRAND_FONT_HEADING,
-=======
-    fontFace: BRAND_FONT,
->>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
   });
 
   if (items.length > 0) {
@@ -105,11 +93,7 @@ export function drawIconCard(
         h: h - circleSize - 0.9,
         fontSize: 10.5,
         color: BRAND_COLORS.textDark,
-<<<<<<< HEAD
         fontFace: BRAND_FONT_BODY,
-=======
-        fontFace: BRAND_FONT,
->>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
         valign: 'top',
         lineSpacingMultiple: 1.3,
       },

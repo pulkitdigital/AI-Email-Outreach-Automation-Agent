@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 import { BRAND_COLORS, BRAND_FONT_BODY, BRAND_FONT_HEADING } from '../brand.js';
-=======
-import { BRAND_COLORS, BRAND_FONT } from '../brand.js';
->>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
 import { SERVICE_DEEP_DIVE } from '../staticContent.js';
 import { addSlideTitle, type Slide } from './cardHelpers.js';
 
@@ -35,11 +31,7 @@ export function addServiceDeepDiveSlide(slide: Slide): void {
       h: 0.85,
       fontSize: 13,
       color: BRAND_COLORS.teal,
-<<<<<<< HEAD
       fontFace: BRAND_FONT_BODY,
-=======
-      fontFace: BRAND_FONT,
->>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
       align: 'center',
       valign: 'middle',
     },
@@ -87,11 +79,7 @@ export function addServiceDeepDiveSlide(slide: Slide): void {
       fontSize: 12,
       bold: true,
       color: BRAND_COLORS.teal,
-<<<<<<< HEAD
       fontFace: BRAND_FONT_HEADING,
-=======
-      fontFace: BRAND_FONT,
->>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
       align: 'center',
       valign: 'top',
     });
@@ -102,11 +90,7 @@ export function addServiceDeepDiveSlide(slide: Slide): void {
       h: cardH - 1.75,
       fontSize: 10,
       color: BRAND_COLORS.textDark,
-<<<<<<< HEAD
       fontFace: BRAND_FONT_BODY,
-=======
-      fontFace: BRAND_FONT,
->>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
       align: 'center',
       valign: 'top',
     });

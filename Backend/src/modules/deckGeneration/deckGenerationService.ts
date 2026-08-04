@@ -10,24 +10,17 @@ import { enqueueDeckGenerationJob } from '../../queue/queues.js';
 import { getStorageProvider } from '../../storage/index.js';
 import { buildDeckForLead, DECK_TEMPLATE_VERSION } from './deckBuilder.js';
 import { DeckGenerationPreconditionError } from './errors.js';
-<<<<<<< HEAD
 import { convertPptxToPdf } from './pptxToPdf.js';
-=======
->>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
 
 const GENERATED_BY = 'pptxgenjs-template';
 const PPTX_CONTENT_TYPE =
   'application/vnd.openxmlformats-officedocument.presentationml.presentation';
-<<<<<<< HEAD
 const PDF_CONTENT_TYPE = 'application/pdf';
-=======
->>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
 
 function buildStorageKey(leadId: string, pitchDeckId: string): string {
   return `pitch-decks/${leadId}/${pitchDeckId}.pptx`;
 }
 
-<<<<<<< HEAD
 function buildPdfStorageKey(leadId: string, pitchDeckId: string): string {
   return `pitch-decks/${leadId}/${pitchDeckId}.pdf`;
 }
@@ -37,24 +30,17 @@ function resolveFileUrl(
   pitchDeckId: string,
   variant: 'pptx' | 'pdf' = 'pptx',
 ): string {
-=======
-function resolveFileUrl(fileKey: string, pitchDeckId: string): string {
->>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
   if (env.R2_PUBLIC_URL) {
     return `${env.R2_PUBLIC_URL.replace(/\/$/, '')}/${fileKey}`;
   }
   // No public bucket domain configured (local dev, or a private R2 bucket) — fall back to our
   // own provider-agnostic download route (see routes/decks.ts), which works for both storage
   // backends. Relative on purpose; the caller/dashboard prefixes it with the backend origin.
-<<<<<<< HEAD
   // Both variants share one route (keyed by pitchDeckId only) — ?format=pdf picks the .pdf
   // rendering instead of the default .pptx, since a single pitch_decks row now has both.
   return variant === 'pdf'
     ? `/api/decks/${pitchDeckId}/download?format=pdf`
     : `/api/decks/${pitchDeckId}/download`;
-=======
-  return `/api/decks/${pitchDeckId}/download`;
->>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
 }
 
 /**
@@ -122,7 +108,6 @@ export async function generateDeckForLead(leadId: string, pitchDeckId: string): 
     const fileKey = buildStorageKey(leadId, pitchDeckId);
     await storage.putObject(fileKey, buffer, PPTX_CONTENT_TYPE);
 
-<<<<<<< HEAD
     // Converts the just-built .pptx to .pdf via LibreOffice headless (pptxToPdf.ts) right here,
     // at generation time rather than at send time in sendingService.ts — deliberately, for three
     // reasons: (1) conversion runs once per deck, not once per send attempt (a 'new'-stage send
@@ -136,19 +121,14 @@ export async function generateDeckForLead(leadId: string, pitchDeckId: string): 
     const pdfFileKey = buildPdfStorageKey(leadId, pitchDeckId);
     await storage.putObject(pdfFileKey, pdfBuffer, PDF_CONTENT_TYPE);
 
-=======
->>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
     await updatePitchDeckStatus(pitchDeckId, {
       status: 'ready',
       generationError: null,
       generatedBy: GENERATED_BY,
       fileKey,
       fileUrl: resolveFileUrl(fileKey, pitchDeckId),
-<<<<<<< HEAD
       pdfFileKey,
       pdfFileUrl: resolveFileUrl(pdfFileKey, pitchDeckId, 'pdf'),
-=======
->>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
     });
 
     // Non-regressive, same philosophy as categorization: only advance a lead that's actually

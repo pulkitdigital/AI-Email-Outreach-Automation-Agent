@@ -86,7 +86,6 @@ decksRouter.get('/:id', async (req, res) => {
   }
 });
 
-<<<<<<< HEAD
 /**
  * Provider-agnostic download: works whether the file lives in R2 or local disk (see
  * storage/index.ts). Defaults to the .pptx; `?format=pdf` serves the LibreOffice-converted
@@ -107,19 +106,10 @@ decksRouter.get('/:id/download', async (req, res) => {
       res.status(404).json({
         error: `No downloadable ${wantsPdf ? 'PDF' : 'PPTX'} for pitch deck: ${req.params.id}`,
       });
-=======
-/** Provider-agnostic download: works whether the file lives in R2 or local disk (see storage/index.ts). */
-decksRouter.get('/:id/download', async (req, res) => {
-  try {
-    const deck = await getPitchDeckById(req.params.id);
-    if (!deck || !deck.fileKey) {
-      res.status(404).json({ error: `No downloadable file for pitch deck: ${req.params.id}` });
->>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
       return;
     }
 
     const storage = getStorageProvider();
-<<<<<<< HEAD
     const buffer = await storage.getObject(fileKey);
 
     res.setHeader(
@@ -132,15 +122,6 @@ decksRouter.get('/:id/download', async (req, res) => {
       'Content-Disposition',
       `attachment; filename="pitch-deck-${deck.id}.${wantsPdf ? 'pdf' : 'pptx'}"`,
     );
-=======
-    const buffer = await storage.getObject(deck.fileKey);
-
-    res.setHeader(
-      'Content-Type',
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    );
-    res.setHeader('Content-Disposition', `attachment; filename="pitch-deck-${deck.id}.pptx"`);
->>>>>>> 8e37ccd7b7ac19849c4ba3b08a803cc49cbe28f7
     res.send(buffer);
   } catch (err) {
     console.error(`[decks-route] failed to download deck ${req.params.id}:`, err);
