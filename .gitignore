@@ -42,3 +42,9 @@ Backend/secrets/
 # Redis / Postgres local volumes (if bind-mounted instead of named volumes)
 .docker-data/
 .json/
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!eslint*.json
+!turbo.json
