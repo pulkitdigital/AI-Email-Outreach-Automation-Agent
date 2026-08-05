@@ -2,7 +2,13 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as api from './api-client';
-import type { LeadsQuery, RepliesQuery, SentEmailLogsQuery } from './api-client';
+import type {
+  LeadsQuery,
+  RepliesQuery,
+  SendWhatsAppMessageInput,
+  SentEmailLogsQuery,
+  WhatsAppMessagesQuery,
+} from './api-client';
 
 /**
  * Near-real-time updates via polling (Phase 6 requirement) — TanStack Query's refetchInterval is
@@ -16,6 +22,16 @@ const NON_TERMINAL_JOB_STATUSES = new Set(['pending', 'processing']);
 
 export function useCategories() {
   return useQuery({ queryKey: ['categories'], queryFn: api.getCategories, staleTime: 60_000 });
+}
+
+export function useCreateCategory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: api.CreateCategoryInput) => api.createCategory(input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['categories'] });
+    },
+  });
 }
 
 export function useLeads(query: LeadsQuery) {
@@ -53,6 +69,27 @@ export function useConfirmLead(id: string) {
   });
 }
 
+export function useDeleteLead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteLead(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['leads'] });
+    },
+  });
+}
+
+export function useUpdateLeadStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) => api.updateLeadStatus(id, status),
+    onSuccess: (_data, { id }) => {
+      void queryClient.invalidateQueries({ queryKey: ['lead', id] });
+      void queryClient.invalidateQueries({ queryKey: ['leads'] });
+    },
+  });
+}
+
 export function useRecategorizeLead() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -77,12 +114,27 @@ export function useRegenerateDeck() {
 export function useSendNow() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ leadId, stage }: { leadId: string; stage: 'new' | 'followup' | 'final' }) =>
-      api.sendNow(leadId, stage),
+    mutationFn: ({
+      leadId,
+      stage,
+      override,
+    }: {
+      leadId: string;
+      stage: 'new' | 'followup' | 'final';
+      override?: api.SendNowOverride;
+    }) => api.sendNow(leadId, stage, override),
     onSuccess: (_data, { leadId }) => {
       void queryClient.invalidateQueries({ queryKey: ['lead', leadId] });
       void queryClient.invalidateQueries({ queryKey: ['sentEmailLogs'] });
     },
+  });
+}
+
+/** Feature B ("edit before sending") — fetched on-demand when the edit modal opens, not via useQuery, since it's a one-shot read tied to opening the dialog rather than data the page displays continuously. */
+export function usePreviewSend() {
+  return useMutation({
+    mutationFn: ({ leadId, stage }: { leadId: string; stage: 'new' | 'followup' | 'final' }) =>
+      api.previewSend(leadId, stage),
   });
 }
 
@@ -152,5 +204,42 @@ export function useSystemStatus() {
     queryKey: ['systemStatus'],
     queryFn: api.getSystemStatus,
     refetchInterval: SYSTEM_STATUS_POLL_MS,
+  });
+}
+
+export function useWhatsAppMessages(query: WhatsAppMessagesQuery) {
+  return useQuery({
+    queryKey: ['whatsappMessages', query],
+    queryFn: () => api.getWhatsAppMessages(query),
+  });
+}
+
+export function useWhatsAppTemplates(approvalStatus?: string) {
+  return useQuery({
+    queryKey: ['whatsappTemplates', approvalStatus],
+    queryFn: () => api.getWhatsAppTemplates(approvalStatus),
+  });
+}
+
+export function useOptInLeadForWhatsApp(leadId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ phoneNumber, source }: { phoneNumber: string; source?: 'manual' | 'reply_offer' }) =>
+      api.optInLeadForWhatsApp(leadId, phoneNumber, source),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['lead', leadId] });
+      void queryClient.invalidateQueries({ queryKey: ['leads'] });
+    },
+  });
+}
+
+export function useSendWhatsAppMessage(leadId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SendWhatsAppMessageInput) => api.sendWhatsAppMessage(leadId, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['lead', leadId] });
+      void queryClient.invalidateQueries({ queryKey: ['whatsappMessages'] });
+    },
   });
 }

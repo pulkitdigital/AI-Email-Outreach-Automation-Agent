@@ -10,12 +10,32 @@ export type LeadStatus =
   | 'new'
   | 'needs_review' // Phase 1: ingested but extraction confidence too low to trust — never auto-promoted
   | 'categorized'
-  | 'deck_generated'
+  | 'deck_generated' // automation-only pipeline state — see PIPELINE_ONLY_STATUSES below
   | 'in_sequence'
-  | 'completed'
+  | 'completed' // automation-only: sequence ran out of stages with no reply — see PIPELINE_ONLY_STATUSES
   | 'replied'
   | 'bounced'
-  | 'do_not_contact';
+  | 'do_not_contact' // automation-only: set by unsubscribe-link clicks and reply/bounce tracking — see PIPELINE_ONLY_STATUSES
+  // Phase 6: dashboard's manually-set-only statuses (never written by categorization/deck/
+  // sending/reply-tracking automation) — see leads.status_manually_set and
+  // Backend/src/routes/leads.ts's PATCH /api/leads/:id/status.
+  | 'contacted'
+  | 'converted'
+  | 'not_interested'
+  | 'unsubscribed';
+
+/**
+ * Terminal statuses a human can manually set via PATCH /api/leads/:id/status that automation
+ * must never silently overwrite once set (see leads.status_manually_set and
+ * Backend/src/db/repositories/leadsRepository.ts's updateLeadStatus guard). Deliberately narrower
+ * than "every manually-settable status" — e.g. a lead manually marked 'contacted' should still be
+ * able to advance through the automated pipeline (deck generation, sending) afterward.
+ */
+export const PROTECTED_TERMINAL_STATUSES: LeadStatus[] = [
+  'converted',
+  'not_interested',
+  'unsubscribed',
+];
 
 /**
  * Why a lead landed in status 'needs_review'. Phase 1 producers: pdfParser (heuristic table

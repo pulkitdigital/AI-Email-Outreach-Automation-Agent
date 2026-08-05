@@ -7,6 +7,8 @@ import type {
   ReplyListResponse,
   SentEmailLogListResponse,
   SystemStatus,
+  WhatsAppMessageListResponse,
+  WhatsAppTemplate,
 } from './types';
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000').replace(/\/$/, '');
@@ -95,6 +97,30 @@ export function recategorizeLead(leadId: string): Promise<{ status: string }> {
   return request(`/api/categorization/leads/${leadId}/recategorize`, { method: 'POST' });
 }
 
+export interface CreateCategoryRuleInput {
+  matchField: 'industry' | 'company_name' | 'website' | 'raw_data' | 'any';
+  pattern: string;
+  weight?: number;
+}
+
+export interface CreateCategoryInput {
+  name: string;
+  /**
+   * Omit to let the backend's AI provider classify the category and propose starter rules (the
+   * dashboard's "Add category" flow — see AddCategoryDialog). Accepted explicitly only for
+   * backward compatibility with non-dashboard callers.
+   */
+  serviceGroup?: string;
+  rules?: CreateCategoryRuleInput[];
+}
+
+export function createCategory(input: CreateCategoryInput): Promise<Category> {
+  return request('/api/categorization/categories', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Leads
 // ---------------------------------------------------------------------------
@@ -127,6 +153,14 @@ export function confirmLead(
   return request(`/api/leads/${id}/confirm`, { method: 'POST', body: JSON.stringify(patch) });
 }
 
+export function deleteLead(id: string): Promise<{ id: string; deletedAt: string | null }> {
+  return request(`/api/leads/${id}`, { method: 'DELETE' });
+}
+
+export function updateLeadStatus(id: string, status: string): Promise<LeadDetail> {
+  return request(`/api/leads/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+}
+
 // ---------------------------------------------------------------------------
 // Decks
 // ---------------------------------------------------------------------------
@@ -143,14 +177,32 @@ export function deckDownloadUrl(deckId: string): string {
 // Sending
 // ---------------------------------------------------------------------------
 
+export interface SendNowOverride {
+  composedSubject: string;
+  composedBody: string;
+}
+
 export function sendNow(
   leadId: string,
   stage: 'new' | 'followup' | 'final',
+  override?: SendNowOverride,
 ): Promise<{ status: string }> {
   return request(`/api/sending/leads/${leadId}/send-now`, {
     method: 'POST',
-    body: JSON.stringify({ stage }),
+    body: JSON.stringify({ stage, ...override }),
   });
+}
+
+export interface EmailPreview {
+  subject: string;
+  body: string;
+}
+
+export function previewSend(
+  leadId: string,
+  stage: 'new' | 'followup' | 'final',
+): Promise<EmailPreview> {
+  return request(`/api/sending/leads/${leadId}/preview${buildQuery({ stage })}`);
 }
 
 export interface SentEmailLogsQuery {
@@ -199,4 +251,48 @@ export function getReplies(query: RepliesQuery): Promise<ReplyListResponse> {
 
 export function getSystemStatus(): Promise<SystemStatus> {
   return request('/api/system/status');
+}
+
+// ---------------------------------------------------------------------------
+// WhatsApp
+// ---------------------------------------------------------------------------
+
+export interface WhatsAppMessagesQuery {
+  matched?: boolean;
+  optedIn?: boolean;
+  page?: number;
+  pageSize?: number;
+}
+
+export function getWhatsAppMessages(query: WhatsAppMessagesQuery): Promise<WhatsAppMessageListResponse> {
+  return request(`/api/whatsapp/messages${buildQuery(query)}`);
+}
+
+export function getWhatsAppTemplates(approvalStatus?: string): Promise<WhatsAppTemplate[]> {
+  return request(`/api/whatsapp/templates${buildQuery({ approvalStatus })}`);
+}
+
+export function optInLeadForWhatsApp(
+  leadId: string,
+  phoneNumber: string,
+  source?: 'manual' | 'reply_offer',
+): Promise<LeadDetail> {
+  return request(`/api/leads/${leadId}/whatsapp/opt-in`, {
+    method: 'POST',
+    body: JSON.stringify({ phoneNumber, source }),
+  });
+}
+
+export type SendWhatsAppMessageInput =
+  | { type: 'template'; templateName: string; language?: string; variables?: Record<string, string> }
+  | { type: 'freeform'; body: string };
+
+export function sendWhatsAppMessage(
+  leadId: string,
+  input: SendWhatsAppMessageInput,
+): Promise<{ status: string }> {
+  return request(`/api/leads/${leadId}/whatsapp/send`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
 }

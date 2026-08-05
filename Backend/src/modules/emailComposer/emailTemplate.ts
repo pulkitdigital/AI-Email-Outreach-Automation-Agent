@@ -24,6 +24,8 @@ export interface RenderEmailInput {
   greetingName: string;
   paragraphs: string[];
   unsubscribeUrl: string;
+  /** Click-to-WhatsApp link (see modules/whatsapp/clickToWhatsapp.ts) — omitted/null renders no WhatsApp line, the same as before this existed. Behind WHATSAPP_CTA_ENABLED, default off. */
+  whatsappCtaUrl?: string | null;
 }
 
 /**
@@ -40,6 +42,10 @@ export function renderEmailHtml(input: RenderEmailInput): string {
     )
     .join('\n');
 
+  const whatsappHtml = input.whatsappCtaUrl
+    ? `<p style="margin: 0 0 16px; font-size: 15px; color: #2B2B2B;">Prefer WhatsApp? <a href="${escapeHtml(input.whatsappCtaUrl)}" style="color: ${BRAND_TEAL};">Message us there</a> instead.</p>`
+    : '';
+
   return `<!DOCTYPE html>
 <html>
   <body style="margin: 0; padding: 0; background-color: #FFFFFF; font-family: Arial, sans-serif;">
@@ -48,6 +54,7 @@ export function renderEmailHtml(input: RenderEmailInput): string {
         <td style="padding: 24px;">
           <p style="margin: 0 0 16px; font-size: 15px; color: #2B2B2B;">Hi ${escapeHtml(input.greetingName)},</p>
           ${paragraphsHtml}
+          ${whatsappHtml}
           <p style="margin: 24px 0 4px; font-size: 15px; color: #2B2B2B;">Best,</p>
           <p style="margin: 0 0 24px; font-size: 15px; color: #2B2B2B;">
             <strong style="color: ${BRAND_ORANGE};">Be</strong><strong style="color: ${BRAND_TEAL};">Beyond</strong> Digital Solutions<br />
@@ -65,11 +72,36 @@ export function renderEmailHtml(input: RenderEmailInput): string {
 </html>`;
 }
 
+/**
+ * Renders a manually-edited email body (Feature B: per-send "edit before sending" override) as
+ * HTML. Unlike renderEmailHtml, this does NOT add its own greeting/signature/unsubscribe
+ * scaffold — the text passed in here already went through renderEmailText once (the dashboard
+ * shows the user exactly what composeEmail() produced, including that scaffold, for editing), so
+ * re-adding it would duplicate the footer. Escapes HTML and preserves line breaks; imposes no
+ * other structure on the edited content.
+ */
+export function renderPlainTextAsHtml(text: string): string {
+  const escaped = escapeHtml(text).replace(/\n/g, '<br />');
+  return `<!DOCTYPE html>
+<html>
+  <body style="margin: 0; padding: 0; background-color: #FFFFFF; font-family: Arial, sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td style="padding: 24px; font-size: 15px; line-height: 1.6; color: #2B2B2B;">
+          ${escaped}
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
+
 export function renderEmailText(input: RenderEmailInput): string {
   const lines = [
     `Hi ${input.greetingName},`,
     '',
     ...input.paragraphs.flatMap((p) => [p, '']),
+    ...(input.whatsappCtaUrl ? [`Prefer WhatsApp? Message us: ${input.whatsappCtaUrl}`, ''] : []),
     'Best,',
     `${CONTACT.companyName}`,
     `${CONTACT.email} | ${CONTACT.phone}`,

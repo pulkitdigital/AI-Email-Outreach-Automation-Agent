@@ -27,6 +27,30 @@ export interface CategorizeLeadResult {
   secondaryCategoryIds?: string[];
 }
 
+/**
+ * Phase 6 dashboard's manual "Add category" flow (name-only): the model picks the one fixed
+ * service_group the new category belongs to and proposes a starter keyword rule set, mirroring
+ * how the original 4 seeded categories' rules were "agent-proposed, user-confirmed as a first
+ * pass" — see Backend/src/db/migrations/0002_categorization.sql.
+ */
+export interface ClassifyCategoryInput {
+  name: string;
+}
+
+export interface ClassifyCategoryRuleSuggestion {
+  /** Restricted to 'industry' | 'any' (not the full CategorizationRuleMatchField set) — the two
+   *  fields the original seed rules actually used, matching the weight convention below. */
+  matchField: 'industry' | 'any';
+  pattern: string;
+  /** 0.35–0.6, same convention the seed rule set uses — 'industry' hits weighted near 0.6, 'any' hits nearer 0.35. */
+  weight: number;
+}
+
+export interface ClassifyCategoryResult {
+  serviceGroup: ServiceGroup;
+  rules: ClassifyCategoryRuleSuggestion[];
+}
+
 export interface GenerateDeckContentInput {
   leadId: string;
   companyName?: string;
@@ -106,4 +130,5 @@ export interface AIProvider {
     input: ExtractLeadFieldsFromTextInput,
   ): Promise<ExtractLeadFieldsFromTextResult>;
   generateEmailCopy(input: GenerateEmailCopyInput): Promise<GenerateEmailCopyResult>;
+  classifyCategory(input: ClassifyCategoryInput): Promise<ClassifyCategoryResult>;
 }

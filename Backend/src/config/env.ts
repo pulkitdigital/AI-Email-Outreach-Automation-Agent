@@ -112,6 +112,27 @@ const envSchema = z.object({
   // see index.ts's cors() setup. Local dev default covers `npm run dev:dashboard`'s port; add
   // the Vercel production URL here once Frontend is deployed (see .env.example's comment).
   ALLOWED_ORIGINS: z.string().default('http://localhost:3000'),
+
+  // WhatsApp channel (Meta WhatsApp Cloud API) — see shared/src/types/whatsapp.ts and
+  // Backend/src/providers/whatsapp/. All optional at boot (unlike EMAIL_PROVIDER, there's no
+  // WHATSAPP_PROVIDER switch yet — Meta Cloud is the only implementation) — checked at point of
+  // use (MetaCloudWhatsAppProvider's constructor), same lazy-fail pattern as GEMINI_API_KEY/
+  // OPENAI_API_KEY, so local dev without WhatsApp configured doesn't break unrelated work.
+  WHATSAPP_ACCESS_TOKEN: z.string().optional(),
+  WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
+  WHATSAPP_BUSINESS_ACCOUNT_ID: z.string().optional(),
+  WHATSAPP_WEBHOOK_VERIFY_TOKEN: z.string().optional(),
+  WHATSAPP_APP_SECRET: z.string().optional(),
+  // The business number the click-to-WhatsApp link (wa.me) points to — see
+  // Backend/src/modules/whatsapp/clickToWhatsapp.ts. Digits only, country code included, no '+'.
+  WHATSAPP_BUSINESS_NUMBER: z.string().optional(),
+  // Gates whether the click-to-WhatsApp link is actually embedded in outbound emails — default
+  // false since this depends on Meta Business verification being complete before going live
+  // (see Task 5 of the WhatsApp channel spec). Flip to true once verification is confirmed.
+  WHATSAPP_CTA_ENABLED: z
+    .string()
+    .default('false')
+    .transform((v) => v === 'true'),
 });
 
 const parsed = envSchema.safeParse(process.env);

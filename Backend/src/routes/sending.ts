@@ -7,6 +7,8 @@ import {
   type ListSentEmailLogsFilters,
 } from '../db/repositories/sentEmailsLogRepository.js';
 import { enqueueSendEmailJob } from '../queue/queues.js';
+import { previewSequenceEmail } from '../modules/sendingEngine/sendingService.js';
+import { SendPreconditionError } from '../modules/sendingEngine/errors.js';
 
 export const sendingRouter = Router();
 
@@ -79,14 +81,72 @@ sendingRouter.get('/logs', async (req, res) => {
  * the only way to trigger a send in Phase 4 (no scheduler wired up yet — see
  * Docs/ARCHITECTURE.md § 6), which is itself the safety boundary against sending bulk volume:
  * there is no bulk-enqueue endpoint, only this one-lead-at-a-time trigger.
+ *
+ * Optional `composedSubject`/`composedBody` (Feature B, "edit before sending"): when both are
+ * present, the worker sends this exact content instead of composing it fresh — see
+ * sendSequenceEmail()'s `override` parameter. Get the starting text from GET .../preview below.
  */
 sendingRouter.post('/leads/:id/send-now', async (req, res) => {
-  const { stage } = (req.body ?? {}) as { stage?: unknown };
+  const { stage, composedSubject, composedBody } = (req.body ?? {}) as {
+    stage?: unknown;
+    composedSubject?: unknown;
+    composedBody?: unknown;
+  };
 
   if (typeof stage !== 'string' || !VALID_STAGES.includes(stage as (typeof VALID_STAGES)[number])) {
     res
       .status(400)
       .json({ error: `Request body must include "stage" as one of: ${VALID_STAGES.join(', ')}` });
+    return;
+  }
+
+  let override: { composedSubject: string; composedBody: string } | undefined;
+  if (composedSubject !== undefined || composedBody !== undefined) {
+    if (
+      typeof composedSubject !== 'string' ||
+      !composedSubject.trim() ||
+      typeof composedBody !== 'string' ||
+      !composedBody.trim()
+    ) {
+      res.status(400).json({
+        error: '"composedSubject" and "composedBody" must both be non-empty strings when provided',
+      });
+      return;
+    }
+    override = { composedSubject, composedBody };
+  }
+
+  try {
+    const lead = await getLeadById(req.params.id);
+    if (!lead) {
+      res.status(404).json({ error: `Lead not found: ${req.params.id}` });
+      return;
+    }
+
+    await enqueueSendEmailJob({
+      leadId: lead.id,
+      stage: stage as (typeof VALID_STAGES)[number],
+      ...override,
+    });
+    res.status(202).json({ leadId: lead.id, stage, status: 'queued' });
+  } catch (err) {
+    console.error(`[sending-route] failed to enqueue send for lead ${req.params.id}:`, err);
+    res.status(500).json({ error: 'Failed to enqueue send — see server logs for details' });
+  }
+});
+
+/**
+ * GET /api/sending/leads/:id/preview?stage=new — Feature B ("edit before sending"): returns the
+ * subject/body a real send would currently compose, without claiming a send slot or touching
+ * sent_emails_log. The dashboard shows this in an editable modal before the user confirms a send.
+ */
+sendingRouter.get('/leads/:id/preview', async (req, res) => {
+  const { stage } = req.query as Record<string, string | undefined>;
+
+  if (typeof stage !== 'string' || !VALID_STAGES.includes(stage as (typeof VALID_STAGES)[number])) {
+    res
+      .status(400)
+      .json({ error: `Query must include "stage" as one of: ${VALID_STAGES.join(', ')}` });
     return;
   }
 
@@ -97,11 +157,15 @@ sendingRouter.post('/leads/:id/send-now', async (req, res) => {
       return;
     }
 
-    await enqueueSendEmailJob({ leadId: lead.id, stage: stage as (typeof VALID_STAGES)[number] });
-    res.status(202).json({ leadId: lead.id, stage, status: 'queued' });
+    const preview = await previewSequenceEmail(lead.id, stage as (typeof VALID_STAGES)[number]);
+    res.json(preview);
   } catch (err) {
-    console.error(`[sending-route] failed to enqueue send for lead ${req.params.id}:`, err);
-    res.status(500).json({ error: 'Failed to enqueue send — see server logs for details' });
+    if (err instanceof SendPreconditionError) {
+      res.status(422).json({ error: err.message });
+      return;
+    }
+    console.error(`[sending-route] failed to preview send for lead ${req.params.id}:`, err);
+    res.status(500).json({ error: 'Failed to preview email — see server logs for details' });
   }
 });
 

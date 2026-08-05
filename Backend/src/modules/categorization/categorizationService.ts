@@ -1,4 +1,4 @@
-import type { CategoryMatch, LeadStatus } from '@bebeyond/shared';
+import type { CategoryMatch, ClassifyCategoryResult, LeadStatus } from '@bebeyond/shared';
 import { env } from '../../config/env.js';
 import { getCategoryById, listActiveCategories } from '../../db/repositories/categoriesRepository.js';
 import { listActiveCategorizationRules } from '../../db/repositories/categorizationRulesRepository.js';
@@ -8,6 +8,7 @@ import {
 } from '../../db/repositories/leadCategoriesRepository.js';
 import { getLeadById, updateLeadCategorization } from '../../db/repositories/leadsRepository.js';
 import { getAIProvider } from '../../providers/ai/index.js';
+import { AIConfigError, isQuotaOrRateLimitError } from '../../providers/ai/errors.js';
 import { triggerDeckGeneration } from '../deckGeneration/deckGenerationService.js';
 import { evaluateRules, MAX_SECONDARY_CATEGORIES } from './ruleEngine.js';
 
@@ -186,6 +187,74 @@ export async function markCategorizationFailed(leadId: string): Promise<void> {
     status: PRE_CATEGORIZATION_STATUSES.includes(lead.status) ? 'needs_review' : lead.status,
     reviewReason: 'ai_categorization_failed',
   });
+}
+
+/** Retried transient failures (network, malformed response); AIConfigError never is — see classifyNewCategory. */
+const CLASSIFY_CATEGORY_MAX_ATTEMPTS = 3;
+
+/**
+ * Thrown when AI classification of a manually-created category (Phase 6 "Add category", name
+ * only) fails after every attempt. Callers (the route) must treat this as "do not create the
+ * category" — never fall back to a null/guessed service_group, since that would silently break
+ * deck generation and the rule engine for every future lead this category is assigned to.
+ */
+export class CategoryClassificationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CategoryClassificationError';
+  }
+}
+
+/**
+ * Thrown instead of the base CategoryClassificationError when every attempt failed specifically
+ * on a 429/quota-exhausted response (see isQuotaOrRateLimitError). Distinguished from other
+ * classification failures (malformed response, network error, bad API key) because the route
+ * treats it differently: those still block category creation and surface "Retry"; this one
+ * doesn't block creation at all — the category is created with a manual-review default instead.
+ */
+export class CategoryClassificationQuotaError extends CategoryClassificationError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CategoryClassificationQuotaError';
+  }
+}
+
+/**
+ * AI-classifies a new category's name into one of the 4 fixed service_group values and proposes
+ * a starter keyword rule set — the "name only" path for manual category creation (Phase 6
+ * dashboard). Retries transient failures up to CLASSIFY_CATEGORY_MAX_ATTEMPTS times; AIConfigError
+ * (missing/invalid API key) is never retried, the same non-retryable/retryable distinction the
+ * categorization worker makes for categorizeLead. Throws CategoryClassificationError — never
+ * returns a partial/guessed result — if every attempt fails; throws the CategoryClassificationQuotaError
+ * subclass specifically when the last failure was a 429/quota error, so the caller can offer its
+ * own fallback instead of just failing.
+ */
+export async function classifyNewCategory(name: string): Promise<ClassifyCategoryResult> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= CLASSIFY_CATEGORY_MAX_ATTEMPTS; attempt++) {
+    try {
+      return await getAIProvider().classifyCategory({ name });
+    } catch (err) {
+      lastError = err;
+      const status = err && typeof err === 'object' && 'status' in err ? (err as { status?: unknown }).status : undefined;
+      console.error(
+        `[categorization] category classification attempt ${attempt}/${CLASSIFY_CATEGORY_MAX_ATTEMPTS} failed for "${name}" (status=${status ?? 'n/a'}):`,
+        err,
+      );
+      if (err instanceof AIConfigError) {
+        // Retrying a missing/invalid API key can never succeed — don't burn the remaining attempts.
+        break;
+      }
+    }
+  }
+
+  const reason = lastError instanceof Error ? lastError.message : String(lastError);
+  const message = `AI classification failed for category "${name}": ${reason}`;
+  if (isQuotaOrRateLimitError(lastError)) {
+    throw new CategoryClassificationQuotaError(message);
+  }
+  throw new CategoryClassificationError(message);
 }
 
 export class CategoryNotFoundError extends Error {

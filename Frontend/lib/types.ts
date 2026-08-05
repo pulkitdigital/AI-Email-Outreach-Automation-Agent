@@ -8,6 +8,12 @@ import type {
   SentEmailStatus,
   SequenceStage,
   ServiceGroup,
+  WhatsAppConversationCategory,
+  WhatsAppMessageDirection,
+  WhatsAppMessageStatus,
+  WhatsAppMessageType,
+  WhatsAppOptInSource,
+  WhatsAppTemplateApprovalStatus,
 } from '@bebeyond/shared';
 
 export type { IngestionJobProgress };
@@ -17,6 +23,8 @@ export interface Category {
   name: string;
   slug: string;
   serviceGroup: ServiceGroup | null;
+  needsReview: boolean;
+  reviewReason: string | null;
 }
 
 export interface Lead {
@@ -39,6 +47,12 @@ export interface Lead {
   reviewReason: LeadReviewReason | null;
   extractionConfidence: number | null;
   rawData: Record<string, unknown>;
+  deletedAt: string | null;
+  whatsappNumber: string | null;
+  whatsappOptedIn: boolean;
+  whatsappOptInSource: WhatsAppOptInSource | null;
+  whatsappOptInAt: string | null;
+  whatsappLastInboundAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -172,6 +186,46 @@ export interface ReplyListResponse {
   total: number;
   page: number;
   pageSize: number;
+}
+
+export interface WhatsAppMessage {
+  id: string;
+  leadId: string | null;
+  direction: WhatsAppMessageDirection;
+  messageType: WhatsAppMessageType;
+  templateName: string | null;
+  fromPhoneNumber: string | null;
+  bodyPreview: string | null;
+  metaMessageId: string | null;
+  conversationCategory: WhatsAppConversationCategory | null;
+  status: WhatsAppMessageStatus;
+  errorMessage: string | null;
+  rawPayload: unknown;
+  createdAt: string;
+}
+
+export interface WhatsAppMessageListItem extends WhatsAppMessage {
+  leadEmail: string | null;
+  companyName: string | null;
+  leadOptedIn: boolean | null;
+}
+
+export interface WhatsAppMessageListResponse {
+  messages: WhatsAppMessageListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface WhatsAppTemplate {
+  id: string;
+  name: string;
+  metaTemplateId: string | null;
+  language: string;
+  category: WhatsAppConversationCategory | null;
+  approvalStatus: WhatsAppTemplateApprovalStatus;
+  variables: unknown;
+  createdAt: string;
 }
 
 export interface FailedPitchDeckItem extends PitchDeck {

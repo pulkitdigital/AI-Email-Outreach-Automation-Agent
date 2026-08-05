@@ -6,7 +6,11 @@ import {
   markStageSent,
   type SendableStage,
 } from '../../db/repositories/emailSequencesRepository.js';
-import { getLeadById, updateLeadStatus } from '../../db/repositories/leadsRepository.js';
+import {
+  getLeadById,
+  updateLeadStatus,
+  type LeadRecord,
+} from '../../db/repositories/leadsRepository.js';
 import {
   getLatestPitchDeckForLead,
   type PitchDeckRecord,
@@ -23,7 +27,10 @@ import {
   incrementSentCount,
 } from '../../db/repositories/dailySummaryRepository.js';
 import { composeEmail } from '../emailComposer/composerService.js';
+import { renderPlainTextAsHtml } from '../emailComposer/emailTemplate.js';
 import { buildUnsubscribeUrl } from '../emailComposer/unsubscribeToken.js';
+import { buildClickToWhatsAppLink } from '../whatsapp/clickToWhatsapp.js';
+import type { ComposedEmail } from '../emailComposer/types.js';
 import { SERVICE_CATEGORIES } from '../deckGeneration/serviceCatalog.js';
 import { getEmailProvider } from '../../providers/email/index.js';
 import { getStorageProvider } from '../../storage/index.js';
@@ -65,6 +72,63 @@ function assertDeckReady(
 }
 
 /**
+ * Builds the composed email a stage send would use for `lead`, via composeEmail() (AI copy with
+ * static-template fallback — see composerService.ts). Shared by sendSequenceEmail (the real
+ * send) and previewSequenceEmail (the "edit before sending" preview, Feature B) so the two paths
+ * can never drift apart on how content is composed.
+ */
+async function composeForLead(lead: LeadRecord, stage: SendableStage): Promise<ComposedEmail> {
+  if (!lead.categoryId) {
+    throw new SendPreconditionError(`Cannot compose: lead ${lead.id} has no primary category yet`);
+  }
+  const category = await getCategoryById(lead.categoryId);
+  if (!category) {
+    throw new SendPreconditionError(
+      `Cannot compose: lead ${lead.id}'s category ${lead.categoryId} no longer exists`,
+    );
+  }
+  const categoryServices = SERVICE_CATEGORIES.find((c) => c.slug === category.slug)?.services ?? [];
+
+  return composeEmail({
+    leadId: lead.id,
+    companyName: lead.companyName ?? lead.contactName ?? 'your business',
+    contactName: lead.contactName,
+    industry: lead.industry,
+    primaryCategoryName: category.name,
+    primaryCategoryServices: categoryServices,
+    stage,
+    unsubscribeUrl: buildUnsubscribeUrl(lead.id),
+    whatsappCtaUrl: buildClickToWhatsAppLink(lead.companyName),
+  });
+}
+
+/**
+ * Feature B ("edit before sending"): returns the subject + full body that a real send for this
+ * (lead, stage) would currently produce, without claiming a send slot, calling the email
+ * provider, or writing to sent_emails_log — purely a read of what composeForLead() would
+ * generate right now. The dashboard shows this in an editable modal; if the user edits it and
+ * confirms, the edited text comes back as `override` on sendSequenceEmail below.
+ */
+export async function previewSequenceEmail(
+  leadId: string,
+  stage: SendableStage,
+): Promise<{ subject: string; body: string }> {
+  const lead = await getLeadById(leadId);
+  if (!lead) {
+    throw new SendPreconditionError(`Cannot preview: lead not found (${leadId})`);
+  }
+
+  const composed = await composeForLead(lead, stage);
+  return { subject: composed.subject, body: composed.text };
+}
+
+export interface SendContentOverride {
+  subject: string;
+  /** Full body text, in the same shape previewSequenceEmail returns (i.e. composed.text) — edited freely by the user. */
+  body: string;
+}
+
+/**
  * Sends exactly one sequence-stage email for one lead, with dedup as a hard gate at every
  * layer:
  *  1. Lead must exist, have a category, and be in a status that's actually eligible for this
@@ -85,8 +149,18 @@ function assertDeckReady(
  *     flight, but that gap can never be closed from this side.
  * Only after all of this does this compose and actually call the provider. See
  * Docs/ARCHITECTURE.md § 5.
+ *
+ * `override` (Feature B, "edit before sending"): when provided, skips composeForLead()/
+ * composeEmail() entirely and sends exactly the given subject/body instead — the one-time,
+ * per-send content a user reviewed and edited via previewSequenceEmail() above. Every dedup/
+ * eligibility/claimSendAttempt gate above is unaffected; only the content that gets composed
+ * changes. Not persisted anywhere beyond this one sent_emails_log row's body_snapshot.
  */
-export async function sendSequenceEmail(leadId: string, stage: SendableStage): Promise<void> {
+export async function sendSequenceEmail(
+  leadId: string,
+  stage: SendableStage,
+  override?: SendContentOverride,
+): Promise<void> {
   const lead = await getLeadById(leadId);
   if (!lead) {
     throw new Error(`Cannot send: lead not found (${leadId})`);
@@ -127,14 +201,6 @@ export async function sendSequenceEmail(leadId: string, stage: SendableStage): P
     sequence = await getOrCreateSequenceForLead(leadId);
   }
 
-  const category = await getCategoryById(lead.categoryId);
-  if (!category) {
-    throw new SendPreconditionError(
-      `Cannot send: lead ${leadId}'s category ${lead.categoryId} no longer exists`,
-    );
-  }
-  const categoryServices = SERVICE_CATEGORIES.find((c) => c.slug === category.slug)?.services ?? [];
-
   const provider = getEmailProvider();
 
   const claim = await claimSendAttempt({
@@ -152,18 +218,17 @@ export async function sendSequenceEmail(leadId: string, stage: SendableStage): P
     return;
   }
 
-  // composeEmail() never throws — it falls back to a static template internally on AI failure
-  // (see composerService.ts) — so a send is never blocked by an AI provider hiccup.
-  const composed = await composeEmail({
-    leadId,
-    companyName: lead.companyName ?? lead.contactName ?? 'your business',
-    contactName: lead.contactName,
-    industry: lead.industry,
-    primaryCategoryName: category.name,
-    primaryCategoryServices: categoryServices,
-    stage,
-    unsubscribeUrl: buildUnsubscribeUrl(leadId),
-  });
+  // composeForLead()/composeEmail() never throws — it falls back to a static template internally
+  // on AI failure (see composerService.ts) — so a send is never blocked by an AI provider hiccup.
+  // `override` skips composition altogether and sends exactly the user-edited content instead.
+  const composed: ComposedEmail = override
+    ? {
+        subject: override.subject,
+        html: renderPlainTextAsHtml(override.body),
+        text: override.body,
+        usedAiCopy: false,
+      }
+    : await composeForLead(lead, stage);
 
   const recheckLead = await getLeadById(leadId);
   if (!recheckLead || !ELIGIBLE_STATUSES_BY_STAGE[stage].includes(recheckLead.status)) {

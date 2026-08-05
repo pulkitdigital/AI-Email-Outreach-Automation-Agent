@@ -21,6 +21,7 @@ import { sendingRouter } from './routes/sending.js';
 import { systemRouter } from './routes/system.js';
 import { unsubscribeRouter } from './routes/unsubscribe.js';
 import { webhooksRouter } from './routes/webhooks.js';
+import { whatsappRouter } from './routes/whatsapp.js';
 
 /**
  * Ingestion (Phase 1), Categorization (Phase 2), Deck Generation (Phase 3), Email
@@ -46,7 +47,20 @@ const allowedOrigins = env.ALLOWED_ORIGINS.split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
 app.use(cors({ origin: allowedOrigins }));
-app.use(express.json());
+// `verify` stashes the raw body bytes on every request — cheap, and needed by the WhatsApp
+// webhook route to verify Meta's HMAC signature (X-Hub-Signature-256), which is computed over
+// the raw bytes, not a re-serialized JSON.stringify(req.body). See src/types/express.d.ts and
+// routes/webhooks.ts.
+app.use(
+  express.json({
+    // body-parser's `verify` typing is against plain http.IncomingMessage, not express.Request
+    // (where the src/types/express.d.ts augmentation lives) — the cast is safe since this
+    // callback only ever runs as part of Express's own request pipeline.
+    verify: (req, _res, buf) => {
+      (req as express.Request).rawBody = buf;
+    },
+  }),
+);
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', emailProvider: env.EMAIL_PROVIDER, aiProvider: env.AI_PROVIDER });
@@ -60,6 +74,7 @@ app.use('/api/sending', sendingRouter);
 app.use('/api/scheduler', schedulerRouter);
 app.use('/api/replies', repliesRouter);
 app.use('/api/system', systemRouter);
+app.use('/api/whatsapp', whatsappRouter);
 // Not under /api — this is a public link clicked from an email client, not a JSON API.
 app.use('/unsubscribe', unsubscribeRouter);
 // Not under /api — Brevo (an external service) posts here directly; auth is a path-segment

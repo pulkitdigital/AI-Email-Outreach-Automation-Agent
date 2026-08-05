@@ -1,12 +1,15 @@
 import { Router } from 'express';
-import type { LeadStatus, SequenceStage } from '@bebeyond/shared';
+import type { LeadStatus, SequenceStage, WhatsAppOptInSource } from '@bebeyond/shared';
 import { getCategoryById } from '../db/repositories/categoriesRepository.js';
 import {
   getLeadById,
   listLeads,
+  setLeadStatusManually,
+  softDeleteLead,
   updateLeadFields,
   type ListLeadsFilters,
 } from '../db/repositories/leadsRepository.js';
+import { optInLeadForWhatsApp } from '../db/repositories/whatsappRepository.js';
 import { getSequenceForLead } from '../db/repositories/emailSequencesRepository.js';
 import { getLatestPitchDeckForLead } from '../db/repositories/pitchDecksRepository.js';
 import { listSentEmailLogsForLead } from '../db/repositories/sentEmailsLogRepository.js';
@@ -17,6 +20,16 @@ import {
   assignCategoryManually,
   CategoryNotFoundError,
 } from '../modules/categorization/categorizationService.js';
+import {
+  sendWhatsAppFreeformMessage,
+  sendWhatsAppTemplateMessage,
+} from '../modules/whatsapp/whatsappService.js';
+import {
+  WhatsAppConfigError,
+  WhatsAppFreeformWindowExpiredError,
+  WhatsAppNoNumberError,
+  WhatsAppNotOptedInError,
+} from '../providers/whatsapp/errors.js';
 
 export const leadsRouter = Router();
 
@@ -27,7 +40,11 @@ const VALID_STATUSES: LeadStatus[] = [
   'deck_generated',
   'in_sequence',
   'completed',
+  'contacted',
   'replied',
+  'converted',
+  'not_interested',
+  'unsubscribed',
   'bounced',
   'do_not_contact',
 ];
@@ -181,6 +198,58 @@ leadsRouter.patch('/:id', async (req, res) => {
 });
 
 /**
+ * PATCH /api/leads/:id/status — the dashboard's manual status-change action, independent of the
+ * automated pipeline's own status transitions (categorization/deck generation/sending/reply
+ * tracking). Goes through setLeadStatusManually, not updateLeadFields/updateLeadCategorization —
+ * see that function's docstring for why a manual change always takes effect (no protected-status
+ * guard) while automation's own status writes do get guarded against overwriting it afterward.
+ */
+leadsRouter.patch('/:id/status', async (req, res) => {
+  const { status } = (req.body ?? {}) as { status?: unknown };
+
+  if (typeof status !== 'string' || !VALID_STATUSES.includes(status as LeadStatus)) {
+    res.status(400).json({ error: `"status" must be one of: ${VALID_STATUSES.join(', ')}` });
+    return;
+  }
+
+  try {
+    const lead = await getLeadById(req.params.id);
+    if (!lead) {
+      res.status(404).json({ error: `Lead not found: ${req.params.id}` });
+      return;
+    }
+
+    const updated = await setLeadStatusManually(req.params.id, status as LeadStatus);
+    res.json(updated);
+  } catch (err) {
+    console.error(`[leads-route] failed to update status for lead ${req.params.id}:`, err);
+    res.status(500).json({ error: 'Failed to update lead status — see server logs for details' });
+  }
+});
+
+/**
+ * DELETE /api/leads/:id — the dashboard's per-row "Delete" action. Always archives (soft-delete)
+ * rather than removing the row — see softDeleteLead's docstring for why a hard delete isn't safe
+ * here (sent_emails_log/email_sequences CASCADE off leads.id, so it would destroy send history).
+ * Idempotent: deleting an already-archived lead just returns it unchanged rather than erroring.
+ */
+leadsRouter.delete('/:id', async (req, res) => {
+  try {
+    const lead = await getLeadById(req.params.id);
+    if (!lead) {
+      res.status(404).json({ error: `Lead not found: ${req.params.id}` });
+      return;
+    }
+
+    const archived = (await softDeleteLead(req.params.id)) ?? lead;
+    res.json({ id: archived.id, deletedAt: archived.deletedAt });
+  } catch (err) {
+    console.error(`[leads-route] failed to delete lead ${req.params.id}:`, err);
+    res.status(500).json({ error: 'Failed to delete lead — see server logs for details' });
+  }
+});
+
+/**
  * POST /api/leads/:id/confirm — the dashboard's "needs review" queue action: apply any edits
  * made inline, then move the lead out of needs_review and back into the normal pipeline
  * (re-running categorization, exactly as the existing recategorize endpoint does — confirming
@@ -203,5 +272,122 @@ leadsRouter.post('/:id/confirm', async (req, res) => {
     }
     console.error(`[leads-route] failed to confirm lead ${req.params.id}:`, err);
     res.status(500).json({ error: 'Failed to confirm lead — see server logs for details' });
+  }
+});
+
+const VALID_MANUAL_WHATSAPP_OPT_IN_SOURCES: WhatsAppOptInSource[] = ['manual', 'reply_offer'];
+
+/**
+ * POST /api/leads/:id/whatsapp/opt-in — the dashboard's staff-facing "Mark as opted in" action
+ * (Phase 7 WhatsApp channel): covers the reply-based opt-in path, where a lead shares consent to
+ * be contacted on WhatsApp via an email reply and staff manually records the number. This is the
+ * ONLY route allowed to call optInLeadForWhatsApp directly (see that function's docstring) — the
+ * webhook route calls it too, for the click-to-WhatsApp path, but with a fixed source it
+ * controls itself, never from request input.
+ */
+leadsRouter.post('/:id/whatsapp/opt-in', async (req, res) => {
+  const { phoneNumber, source } = (req.body ?? {}) as { phoneNumber?: unknown; source?: unknown };
+
+  if (typeof phoneNumber !== 'string' || !phoneNumber.trim()) {
+    res.status(400).json({ error: 'Request body must include a non-empty "phoneNumber"' });
+    return;
+  }
+  const resolvedSource = source === undefined ? 'manual' : source;
+  if (
+    typeof resolvedSource !== 'string' ||
+    !VALID_MANUAL_WHATSAPP_OPT_IN_SOURCES.includes(resolvedSource as WhatsAppOptInSource)
+  ) {
+    res.status(400).json({
+      error: `"source" must be one of: ${VALID_MANUAL_WHATSAPP_OPT_IN_SOURCES.join(', ')}`,
+    });
+    return;
+  }
+
+  try {
+    const lead = await getLeadById(req.params.id);
+    if (!lead) {
+      res.status(404).json({ error: `Lead not found: ${req.params.id}` });
+      return;
+    }
+
+    const updated = await optInLeadForWhatsApp(
+      req.params.id,
+      phoneNumber.trim(),
+      resolvedSource as WhatsAppOptInSource,
+    );
+    res.json(updated);
+  } catch (err) {
+    console.error(`[leads-route] failed to opt in lead ${req.params.id} for WhatsApp:`, err);
+    res.status(500).json({ error: 'Failed to record WhatsApp opt-in — see server logs for details' });
+  }
+});
+
+/**
+ * POST /api/leads/:id/whatsapp/send — the dashboard's manual WhatsApp send action (channel
+ * infrastructure only, per the Phase 7 spec — NOT wired into the Daily Scheduler). Both branches
+ * go through whatsappService, which re-checks whatsapp_opted_in fresh from the DB before ever
+ * touching the provider — this route never bypasses that.
+ */
+leadsRouter.post('/:id/whatsapp/send', async (req, res) => {
+  const body = (req.body ?? {}) as {
+    type?: unknown;
+    templateName?: unknown;
+    language?: unknown;
+    variables?: unknown;
+    body?: unknown;
+  };
+
+  try {
+    const lead = await getLeadById(req.params.id);
+    if (!lead) {
+      res.status(404).json({ error: `Lead not found: ${req.params.id}` });
+      return;
+    }
+
+    if (body.type === 'template') {
+      if (typeof body.templateName !== 'string' || !body.templateName.trim()) {
+        res.status(400).json({ error: '"templateName" is required for a template send' });
+        return;
+      }
+      const language = typeof body.language === 'string' && body.language ? body.language : 'en';
+      const variables =
+        body.variables && typeof body.variables === 'object'
+          ? (body.variables as Record<string, string>)
+          : {};
+
+      await sendWhatsAppTemplateMessage(req.params.id, body.templateName, language, variables);
+      res.status(202).json({ status: 'sent' });
+      return;
+    }
+
+    if (body.type === 'freeform') {
+      if (typeof body.body !== 'string' || !body.body.trim()) {
+        res.status(400).json({ error: '"body" is required for a freeform send' });
+        return;
+      }
+
+      await sendWhatsAppFreeformMessage(req.params.id, body.body);
+      res.status(202).json({ status: 'sent' });
+      return;
+    }
+
+    res.status(400).json({ error: '"type" must be "template" or "freeform"' });
+  } catch (err) {
+    if (
+      err instanceof WhatsAppNotOptedInError ||
+      err instanceof WhatsAppNoNumberError ||
+      err instanceof WhatsAppFreeformWindowExpiredError
+    ) {
+      res.status(400).json({ error: err.message });
+      return;
+    }
+    if (err instanceof WhatsAppConfigError) {
+      res.status(503).json({ error: err.message });
+      return;
+    }
+    console.error(`[leads-route] failed to send WhatsApp message to lead ${req.params.id}:`, err);
+    res
+      .status(502)
+      .json({ error: 'Failed to send WhatsApp message — see server logs for details' });
   }
 });

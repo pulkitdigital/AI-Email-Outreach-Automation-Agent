@@ -94,6 +94,9 @@ export const emailSendQueue = new Queue(EMAIL_SEND_QUEUE_NAME, { connection: red
 export interface SendEmailJobData {
   leadId: string;
   stage: 'new' | 'followup' | 'final';
+  /** Feature B ("edit before sending") — when both present, bypasses composition; see sendSequenceEmail()'s `override` param. */
+  composedSubject?: string;
+  composedBody?: string;
 }
 
 /**

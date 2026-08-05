@@ -9,6 +9,8 @@ export interface ComposeEmailInput {
   primaryCategoryServices: string[];
   stage: SendableStage;
   unsubscribeUrl: string;
+  /** See RenderEmailInput.whatsappCtaUrl (emailTemplate.ts) — optional, behind WHATSAPP_CTA_ENABLED. */
+  whatsappCtaUrl?: string | null;
 }
 
 export interface ComposedEmail {

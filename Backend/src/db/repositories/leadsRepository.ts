@@ -1,8 +1,10 @@
-import type {
-  CategorizationMethod,
-  LeadReviewReason,
-  LeadStatus,
-  SequenceStage,
+import {
+  PROTECTED_TERMINAL_STATUSES,
+  type CategorizationMethod,
+  type LeadReviewReason,
+  type LeadStatus,
+  type SequenceStage,
+  type WhatsAppOptInSource,
 } from '@bebeyond/shared';
 import { pool } from '../pool.js';
 import { computeMergePatch, type MergeableLeadFields } from '../../modules/ingestion/normalize.js';
@@ -17,9 +19,16 @@ export interface LeadRecord extends MergeableLeadFields {
   categorizationMethod: CategorizationMethod | null;
   categorizationConfidence: number | null;
   status: LeadStatus;
+  statusManuallySet: boolean;
   reviewReason: LeadReviewReason | null;
   extractionConfidence: number | null;
   rawData: Record<string, unknown>;
+  deletedAt: Date | null;
+  whatsappNumber: string | null;
+  whatsappOptedIn: boolean;
+  whatsappOptInSource: WhatsAppOptInSource | null;
+  whatsappOptInAt: Date | null;
+  whatsappLastInboundAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -30,8 +39,12 @@ const LEAD_COLUMNS = `
   country, region, ingestion_job_id AS "ingestionJobId", source_file AS "sourceFile",
   category_id AS "categoryId", categorization_method AS "categorizationMethod",
   categorization_confidence AS "categorizationConfidence",
-  status, review_reason AS "reviewReason",
+  status, status_manually_set AS "statusManuallySet", review_reason AS "reviewReason",
   extraction_confidence AS "extractionConfidence", raw_data AS "rawData",
+  deleted_at AS "deletedAt",
+  whatsapp_number AS "whatsappNumber", whatsapp_opted_in AS "whatsappOptedIn",
+  whatsapp_opt_in_source AS "whatsappOptInSource", whatsapp_opt_in_at AS "whatsappOptInAt",
+  whatsapp_last_inbound_at AS "whatsappLastInboundAt",
   created_at AS "createdAt", updated_at AS "updatedAt"
 `;
 
@@ -228,8 +241,12 @@ const LEAD_LIST_COLUMNS = `
   l.country, l.region, l.ingestion_job_id AS "ingestionJobId", l.source_file AS "sourceFile",
   l.category_id AS "categoryId", l.categorization_method AS "categorizationMethod",
   l.categorization_confidence AS "categorizationConfidence",
-  l.status, l.review_reason AS "reviewReason",
+  l.status, l.status_manually_set AS "statusManuallySet", l.review_reason AS "reviewReason",
   l.extraction_confidence AS "extractionConfidence", l.raw_data AS "rawData",
+  l.deleted_at AS "deletedAt",
+  l.whatsapp_number AS "whatsappNumber", l.whatsapp_opted_in AS "whatsappOptedIn",
+  l.whatsapp_opt_in_source AS "whatsappOptInSource", l.whatsapp_opt_in_at AS "whatsappOptInAt",
+  l.whatsapp_last_inbound_at AS "whatsappLastInboundAt",
   l.created_at AS "createdAt", l.updated_at AS "updatedAt"
 `;
 
@@ -382,6 +399,13 @@ export async function updateLeadCategorization(
  * categorization fields at all — e.g. deck generation moving 'categorized' -> 'deck_generated',
  * or flagging 'needs_review' on an exhausted-retries deck failure. Pass reviewReason
  * explicitly (including null to clear it); omitting it leaves the existing value untouched.
+ *
+ * Every caller of this function is an automated pipeline (deck generation, sending engine, reply
+ * tracking, unsubscribe) — never the dashboard's manual status-change action, which goes through
+ * setLeadStatusManually instead. So the WHERE clause guards against exactly one thing: silently
+ * overwriting a status a human deliberately set to one of PROTECTED_TERMINAL_STATUSES. When
+ * blocked, this resolves to a no-op (returns null) rather than an error — a failed-to-advance
+ * status is not a failure the caller needs to react to.
  */
 export async function updateLeadStatus(
   id: string,
@@ -393,8 +417,46 @@ export async function updateLeadStatus(
        status = $2,
        review_reason = CASE WHEN $3 THEN review_reason ELSE $4 END
      WHERE id = $1
+       AND NOT (status_manually_set AND status = ANY($5::text[]))
      RETURNING ${LEAD_COLUMNS}`,
-    [id, status, reviewReason === undefined, reviewReason ?? null],
+    [id, status, reviewReason === undefined, reviewReason ?? null, PROTECTED_TERMINAL_STATUSES],
+  );
+  return (rows[0] as LeadRecord | undefined) ?? null;
+}
+
+/**
+ * The dashboard's manual status-change action (PATCH /api/leads/:id/status) — a human explicitly
+ * choosing a status always wins, unlike updateLeadStatus's automation callers, so there's no
+ * protected-status guard here. Clears review_reason (a human resolving the status has resolved
+ * whatever review reason was pending) and sets status_manually_set so updateLeadStatus knows not
+ * to silently overwrite this choice later if it lands on a protected terminal status.
+ */
+export async function setLeadStatusManually(
+  id: string,
+  status: LeadStatus,
+): Promise<LeadRecord | null> {
+  const { rows } = await pool.query(
+    `UPDATE leads SET status = $2, status_manually_set = true, review_reason = NULL
+     WHERE id = $1
+     RETURNING ${LEAD_COLUMNS}`,
+    [id, status],
+  );
+  return (rows[0] as LeadRecord | undefined) ?? null;
+}
+
+/**
+ * Archives a lead (dashboard's per-row "Delete" action) rather than removing the row: sent_emails_log
+ * and email_sequences both reference leads with ON DELETE CASCADE (see
+ * Backend/src/db/migrations/0001_init.sql), so a hard delete would silently destroy send/reply
+ * history for any lead that has ever been emailed. Soft-deleting instead just excludes the lead
+ * from the default list views (listLeads/listLeadIdsByStatus/findLeadByNormalizedEmail already
+ * filter `deleted_at IS NULL`) while every other row referencing it stays intact. Idempotent:
+ * re-deleting an already-deleted lead is a no-op (the WHERE clause only matches non-deleted rows).
+ */
+export async function softDeleteLead(id: string): Promise<LeadRecord | null> {
+  const { rows } = await pool.query(
+    `UPDATE leads SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL RETURNING ${LEAD_COLUMNS}`,
+    [id],
   );
   return (rows[0] as LeadRecord | undefined) ?? null;
 }

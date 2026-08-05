@@ -40,8 +40,18 @@ export async function composeEmail(input: ComposeEmailInput): Promise<ComposedEm
 
   const greetingName = input.contactName?.trim() || 'there';
 
-  const html = renderEmailHtml({ greetingName, paragraphs, unsubscribeUrl: input.unsubscribeUrl });
-  const text = renderEmailText({ greetingName, paragraphs, unsubscribeUrl: input.unsubscribeUrl });
+  const html = renderEmailHtml({
+    greetingName,
+    paragraphs,
+    unsubscribeUrl: input.unsubscribeUrl,
+    whatsappCtaUrl: input.whatsappCtaUrl,
+  });
+  const text = renderEmailText({
+    greetingName,
+    paragraphs,
+    unsubscribeUrl: input.unsubscribeUrl,
+    whatsappCtaUrl: input.whatsappCtaUrl,
+  });
 
   return { subject, html, text, usedAiCopy };
 }

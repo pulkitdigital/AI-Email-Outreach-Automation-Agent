@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Activity, Inbox, Mail, MessagesSquare, Upload, Users } from 'lucide-react';
+import { Activity, Inbox, Mail, MessageCircle, MessagesSquare, Upload, Users } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -23,6 +23,7 @@ const NAV_ITEMS = [
   { href: '/sent-emails', label: 'Sent Emails', icon: Mail },
   { href: '/daily-summary', label: 'Daily Summary', icon: Inbox },
   { href: '/replies', label: 'Replies', icon: MessagesSquare },
+  { href: '/whatsapp', label: 'WhatsApp', icon: MessageCircle },
 ];
 
 export function AppSidebar() {

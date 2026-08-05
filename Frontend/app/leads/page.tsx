@@ -23,6 +23,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { StatusBadge } from '@/components/status-badge';
+import { LeadStatusSelect } from '@/components/lead-status-select';
+import { LeadCategorySelect } from '@/components/lead-category-select';
+import { DeleteLeadDialog } from '@/components/delete-lead-dialog';
 import { formatDate } from '@/lib/format';
 import type { LeadListItem } from '@/lib/types';
 
@@ -33,7 +36,11 @@ const STATUSES = [
   'deck_generated',
   'in_sequence',
   'completed',
+  'contacted',
   'replied',
+  'converted',
+  'not_interested',
+  'unsubscribed',
   'bounced',
   'do_not_contact',
 ];
@@ -65,13 +72,14 @@ const columns: ColumnDef<LeadListItem>[] = [
   {
     accessorKey: 'categoryName',
     header: 'Category',
-    cell: ({ row }) =>
-      row.original.categoryName ?? <span className="text-muted-foreground">—</span>,
+    cell: ({ row }) => (
+      <LeadCategorySelect leadId={row.original.id} categoryId={row.original.categoryId} />
+    ),
   },
   {
     accessorKey: 'status',
     header: 'Status',
-    cell: ({ row }) => <StatusBadge status={row.original.status} />,
+    cell: ({ row }) => <LeadStatusSelect leadId={row.original.id} status={row.original.status} />,
   },
   {
     accessorKey: 'sequenceStage',
@@ -88,6 +96,16 @@ const columns: ColumnDef<LeadListItem>[] = [
     header: 'Ingested',
     cell: ({ row }) => (
       <span className="text-sm text-muted-foreground">{formatDate(row.original.createdAt)}</span>
+    ),
+  },
+  {
+    id: 'actions',
+    header: '',
+    cell: ({ row }) => (
+      <DeleteLeadDialog
+        leadId={row.original.id}
+        leadLabel={row.original.companyName ?? row.original.email}
+      />
     ),
   },
 ];

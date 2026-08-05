@@ -3,12 +3,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const queryMock = vi.fn();
 const releaseMock = vi.fn();
 const connectMock = vi.fn(async () => ({ query: queryMock, release: releaseMock }));
+const poolQueryMock = vi.fn();
 
 vi.mock('../../pool.js', () => ({
-  pool: { connect: connectMock, query: vi.fn() },
+  pool: { connect: connectMock, query: poolQueryMock },
 }));
 
-const { upsertLead } = await import('../leadsRepository.js');
+const { upsertLead, updateLeadStatus, setLeadStatusManually, softDeleteLead } = await import(
+  '../leadsRepository.js'
+);
 
 function baseExisting(overrides: Record<string, unknown> = {}) {
   return {
@@ -40,6 +43,7 @@ describe('upsertLead', () => {
     queryMock.mockReset();
     connectMock.mockClear();
     releaseMock.mockClear();
+    poolQueryMock.mockReset();
   });
 
   it('creates a new lead when the insert hits no conflict', async () => {
@@ -155,5 +159,77 @@ describe('upsertLead', () => {
 
     expect(queryMock.mock.calls.some(([sql]) => sql === 'ROLLBACK')).toBe(true);
     expect(releaseMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('updateLeadStatus', () => {
+  beforeEach(() => {
+    poolQueryMock.mockReset();
+  });
+
+  it('guards its WHERE clause against overwriting a manually-set protected terminal status', async () => {
+    poolQueryMock.mockResolvedValue({ rows: [baseExisting({ status: 'converted' })] });
+
+    await updateLeadStatus('lead-1', 'deck_generated');
+
+    const [sql, params] = poolQueryMock.mock.calls[0]!;
+    expect(sql).toContain('status_manually_set');
+    expect(params).toEqual(['lead-1', 'deck_generated', true, null, ['converted', 'not_interested', 'unsubscribed']]);
+  });
+
+  it('resolves to null when the guard blocks the update (no matching row returned)', async () => {
+    poolQueryMock.mockResolvedValue({ rows: [] });
+
+    const result = await updateLeadStatus('lead-1', 'completed');
+
+    expect(result).toBeNull();
+  });
+});
+
+describe('setLeadStatusManually', () => {
+  beforeEach(() => {
+    poolQueryMock.mockReset();
+  });
+
+  it('sets status, marks status_manually_set, and clears review_reason unconditionally', async () => {
+    poolQueryMock.mockResolvedValue({
+      rows: [baseExisting({ status: 'converted', statusManuallySet: true, reviewReason: null })],
+    });
+
+    const result = await setLeadStatusManually('lead-1', 'converted');
+
+    const [sql, params] = poolQueryMock.mock.calls[0]!;
+    expect(sql).toContain('status_manually_set = true');
+    expect(sql).not.toContain('AND NOT'); // no protected-status guard on the manual path
+    expect(params).toEqual(['lead-1', 'converted']);
+    expect(result?.status).toBe('converted');
+  });
+});
+
+describe('softDeleteLead', () => {
+  beforeEach(() => {
+    poolQueryMock.mockReset();
+  });
+
+  it('sets deleted_at and only matches a currently-active row', async () => {
+    poolQueryMock.mockResolvedValue({
+      rows: [baseExisting({ deletedAt: new Date('2026-01-02') })],
+    });
+
+    const result = await softDeleteLead('lead-1');
+
+    const [sql, params] = poolQueryMock.mock.calls[0]!;
+    expect(sql).toContain('deleted_at = now()');
+    expect(sql).toContain('deleted_at IS NULL');
+    expect(params).toEqual(['lead-1']);
+    expect(result?.deletedAt).toEqual(new Date('2026-01-02'));
+  });
+
+  it('is a no-op (returns null) when the lead is already deleted', async () => {
+    poolQueryMock.mockResolvedValue({ rows: [] });
+
+    const result = await softDeleteLead('lead-1');
+
+    expect(result).toBeNull();
   });
 });

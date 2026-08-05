@@ -33,6 +33,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { StatusBadge } from '@/components/status-badge';
+import { AddCategoryDialog } from '@/components/add-category-dialog';
+import { EditEmailDialog } from '@/components/edit-email-dialog';
+import { WhatsAppPanel } from '@/components/whatsapp-panel';
 import { formatDateTime, titleCase } from '@/lib/format';
 import { deckDownloadUrl } from '@/lib/api-client';
 
@@ -211,6 +214,7 @@ export default function LeadDetailPage() {
               >
                 {updateLead.isPending ? 'Saving…' : 'Save category'}
               </Button>
+              <AddCategoryDialog />
             </div>
           </div>
 
@@ -283,19 +287,23 @@ export default function LeadDetailPage() {
 
           <div className="flex flex-wrap gap-2">
             {SEQUENCE_STEPS.map((step) => (
-              <Button
-                key={step.stage}
-                size="sm"
-                variant="outline"
-                onClick={() => handleSendNow(step.stage)}
-                disabled={sendNow.isPending}
-              >
-                Send {step.label} now
-              </Button>
+              <div key={step.stage} className="flex items-center gap-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleSendNow(step.stage)}
+                  disabled={sendNow.isPending}
+                >
+                  Send {step.label} now
+                </Button>
+                <EditEmailDialog leadId={leadId} stage={step.stage} label={step.label} />
+              </div>
             ))}
           </div>
         </CardContent>
       </Card>
+
+      <WhatsAppPanel lead={lead} />
 
       <Card>
         <CardHeader>

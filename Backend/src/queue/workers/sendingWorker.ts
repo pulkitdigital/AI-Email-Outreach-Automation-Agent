@@ -15,10 +15,14 @@ import { EMAIL_SEND_QUEUE_NAME, type SendEmailJobData } from '../queues.js';
 export const sendingWorker = new Worker<SendEmailJobData>(
   EMAIL_SEND_QUEUE_NAME,
   async (job: Job<SendEmailJobData>) => {
-    const { leadId, stage } = job.data;
+    const { leadId, stage, composedSubject, composedBody } = job.data;
+    const override =
+      composedSubject !== undefined && composedBody !== undefined
+        ? { subject: composedSubject, body: composedBody }
+        : undefined;
 
     try {
-      await sendSequenceEmail(leadId, stage);
+      await sendSequenceEmail(leadId, stage, override);
     } catch (err) {
       if (err instanceof SendPreconditionError) {
         // Retrying can't fix a precondition violation (wrong lead status, no category, dedup

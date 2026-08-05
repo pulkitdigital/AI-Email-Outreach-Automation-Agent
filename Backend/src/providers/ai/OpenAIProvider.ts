@@ -3,6 +3,8 @@ import type {
   AIProvider,
   CategorizeLeadInput,
   CategorizeLeadResult,
+  ClassifyCategoryInput,
+  ClassifyCategoryResult,
   ExtractLeadFieldsFromTextInput,
   ExtractLeadFieldsFromTextResult,
   GenerateDeckContentInput,
@@ -12,9 +14,11 @@ import type {
 } from '@bebeyond/shared';
 import { env } from '../../config/env.js';
 import { parseCategorizationResponse } from './categorizationResponse.js';
+import { parseCategoryClassificationResponse } from './categoryClassificationResponse.js';
 import { parseEmailCopyResponse } from './emailCopyResponse.js';
 import { AIConfigError } from './errors.js';
 import { buildCategorizationPrompt } from './prompts/categorization.js';
+import { buildCategoryClassificationPrompt } from './prompts/categoryClassification.js';
 import { buildEmailCopyPrompt } from './prompts/emailCopy.js';
 
 /**
@@ -70,6 +74,22 @@ export class OpenAIProvider implements AIProvider {
     }
 
     return parseEmailCopyResponse(text);
+  }
+
+  async classifyCategory(input: ClassifyCategoryInput): Promise<ClassifyCategoryResult> {
+    const completion = await this.getClient().chat.completions.create({
+      model: env.OPENAI_MODEL,
+      messages: [{ role: 'user', content: buildCategoryClassificationPrompt(input.name) }],
+      response_format: { type: 'json_object' },
+      temperature: 0.2,
+    });
+
+    const text = completion.choices[0]?.message?.content;
+    if (!text) {
+      throw new Error('OpenAI category classification response had no content');
+    }
+
+    return parseCategoryClassificationResponse(text);
   }
 
   async generateDeckContent(_input: GenerateDeckContentInput): Promise<GenerateDeckContentResult> {

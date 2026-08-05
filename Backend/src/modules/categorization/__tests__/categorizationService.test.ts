@@ -28,7 +28,11 @@ vi.mock('../../../db/repositories/leadCategoriesRepository.js', () => ({
 }));
 
 const categorizeLeadAiMock = vi.fn();
-const getAIProviderMock = vi.fn(() => ({ categorizeLead: categorizeLeadAiMock }));
+const classifyCategoryAiMock = vi.fn();
+const getAIProviderMock = vi.fn(() => ({
+  categorizeLead: categorizeLeadAiMock,
+  classifyCategory: classifyCategoryAiMock,
+}));
 vi.mock('../../../providers/ai/index.js', () => ({
   getAIProvider: getAIProviderMock,
 }));
@@ -40,7 +44,14 @@ vi.mock('../../deckGeneration/deckGenerationService.js', () => ({
   triggerDeckGeneration: triggerDeckGenerationMock,
 }));
 
-const { categorizeLead, markCategorizationFailed } = await import('../categorizationService.js');
+const {
+  categorizeLead,
+  markCategorizationFailed,
+  classifyNewCategory,
+  CategoryClassificationError,
+  CategoryClassificationQuotaError,
+} = await import('../categorizationService.js');
+const { AIConfigError } = await import('../../../providers/ai/errors.js');
 
 function baseLead(overrides: Record<string, unknown> = {}) {
   return {
@@ -82,6 +93,7 @@ beforeEach(() => {
   listActiveCategorizationRulesMock.mockReset();
   replaceSecondaryCategoriesMock.mockReset();
   categorizeLeadAiMock.mockReset();
+  classifyCategoryAiMock.mockReset();
   getAIProviderMock.mockClear();
   triggerDeckGenerationMock.mockReset();
 });
@@ -287,5 +299,78 @@ describe('markCategorizationFailed', () => {
       'lead-1',
       expect.objectContaining({ status: 'in_sequence' }),
     );
+  });
+});
+
+const CLASSIFICATION_RESULT = {
+  serviceGroup: 'digital_marketing' as const,
+  rules: [
+    { matchField: 'industry' as const, pattern: 'hotel', weight: 0.6 },
+    { matchField: 'any' as const, pattern: 'hospitality', weight: 0.35 },
+    { matchField: 'any' as const, pattern: 'resort', weight: 0.35 },
+  ],
+};
+
+describe('classifyNewCategory', () => {
+  it('returns the AI result on a clean first call', async () => {
+    classifyCategoryAiMock.mockResolvedValue(CLASSIFICATION_RESULT);
+
+    const result = await classifyNewCategory('Hospitality & Travel');
+
+    expect(result).toEqual(CLASSIFICATION_RESULT);
+    expect(classifyCategoryAiMock).toHaveBeenCalledTimes(1);
+    expect(classifyCategoryAiMock).toHaveBeenCalledWith({ name: 'Hospitality & Travel' });
+  });
+
+  it('retries a transient failure and succeeds on a later attempt', async () => {
+    classifyCategoryAiMock
+      .mockRejectedValueOnce(new Error('malformed JSON'))
+      .mockResolvedValueOnce(CLASSIFICATION_RESULT);
+
+    const result = await classifyNewCategory('Hospitality & Travel');
+
+    expect(result).toEqual(CLASSIFICATION_RESULT);
+    expect(classifyCategoryAiMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('gives up after exhausting every attempt on persistent transient failures — never returns a guessed result', async () => {
+    classifyCategoryAiMock.mockRejectedValue(new Error('AI API timeout'));
+
+    await expect(classifyNewCategory('Hospitality & Travel')).rejects.toThrow(
+      CategoryClassificationError,
+    );
+    // 3 attempts (CLASSIFY_CATEGORY_MAX_ATTEMPTS) — burns the whole budget on a transient error.
+    expect(classifyCategoryAiMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not retry a config error (bad/missing API key) — fails loudly on the first attempt', async () => {
+    classifyCategoryAiMock.mockRejectedValue(new AIConfigError('GEMINI_API_KEY is not set'));
+
+    await expect(classifyNewCategory('Hospitality & Travel')).rejects.toThrow(
+      CategoryClassificationError,
+    );
+    expect(classifyCategoryAiMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('throws CategoryClassificationQuotaError (a CategoryClassificationError subclass) when every attempt fails on a 429/quota error', async () => {
+    classifyCategoryAiMock.mockRejectedValue(
+      Object.assign(new Error('You exceeded your current quota'), { status: 429 }),
+    );
+
+    await expect(classifyNewCategory('Hospitality & Travel')).rejects.toThrow(
+      CategoryClassificationQuotaError,
+    );
+    await expect(classifyNewCategory('Hospitality & Travel')).rejects.toThrow(
+      CategoryClassificationError,
+    );
+    expect(classifyCategoryAiMock).toHaveBeenCalledTimes(6); // 3 attempts x 2 assertions above
+  });
+
+  it('throws the base (non-quota) error when attempts fail for an unrelated reason', async () => {
+    classifyCategoryAiMock.mockRejectedValue(new Error('malformed JSON'));
+
+    const err = await classifyNewCategory('Hospitality & Travel').catch((e) => e);
+    expect(err).toBeInstanceOf(CategoryClassificationError);
+    expect(err).not.toBeInstanceOf(CategoryClassificationQuotaError);
   });
 });

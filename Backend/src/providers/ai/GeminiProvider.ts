@@ -3,6 +3,8 @@ import type {
   AIProvider,
   CategorizeLeadInput,
   CategorizeLeadResult,
+  ClassifyCategoryInput,
+  ClassifyCategoryResult,
   ExtractLeadFieldsFromTextInput,
   ExtractLeadFieldsFromTextResult,
   GenerateDeckContentInput,
@@ -12,9 +14,11 @@ import type {
 } from '@bebeyond/shared';
 import { env } from '../../config/env.js';
 import { parseCategorizationResponse } from './categorizationResponse.js';
+import { parseCategoryClassificationResponse } from './categoryClassificationResponse.js';
 import { parseEmailCopyResponse } from './emailCopyResponse.js';
 import { AIConfigError } from './errors.js';
 import { buildCategorizationPrompt } from './prompts/categorization.js';
+import { buildCategoryClassificationPrompt } from './prompts/categoryClassification.js';
 import { buildEmailCopyPrompt } from './prompts/emailCopy.js';
 
 /**
@@ -60,6 +64,16 @@ export class GeminiProvider implements AIProvider {
 
     const result = await model.generateContent(buildEmailCopyPrompt(input));
     return parseEmailCopyResponse(result.response.text());
+  }
+
+  async classifyCategory(input: ClassifyCategoryInput): Promise<ClassifyCategoryResult> {
+    const model = this.getClient().getGenerativeModel({
+      model: env.GEMINI_MODEL,
+      generationConfig: { responseMimeType: 'application/json', temperature: 0.2 },
+    });
+
+    const result = await model.generateContent(buildCategoryClassificationPrompt(input.name));
+    return parseCategoryClassificationResponse(result.response.text());
   }
 
   async generateDeckContent(_input: GenerateDeckContentInput): Promise<GenerateDeckContentResult> {
