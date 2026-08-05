@@ -24,6 +24,11 @@ export function addThankYouSlide(slide: Slide, ctx: DeckContext): void {
     color: BRAND_COLORS.teal,
     fontFace: BRAND_FONT_BODY,
     align: 'center',
+    // Same reasoning as coverSlide.ts's "Prepared exclusively for ..." line: ctx.companyName is
+    // free-text lead data with no length cap, rendered here as a single centered line with no
+    // `wrap`, so a long company name could otherwise clip or overflow this box. `fit: 'shrink'`
+    // (the modern, non-deprecated equivalent of `shrinkText`) shrinks the font instead.
+    fit: 'shrink',
   });
 
   slide.addText(

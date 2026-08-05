@@ -63,6 +63,7 @@ vi.mock('../../../db/repositories/sentEmailsLogRepository.js', () => ({
   claimSendAttempt: claimSendAttemptMock,
   markSendResult: markSendResultMock,
   findCrossLeadSendCollision: vi.fn(async () => null),
+  getSentSubjectForStage: vi.fn(async () => 'Original subject'),
 }));
 
 vi.mock('../../../db/repositories/pitchDecksRepository.js', () => ({

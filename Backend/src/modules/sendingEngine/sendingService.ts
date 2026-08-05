@@ -18,6 +18,7 @@ import {
 import {
   claimSendAttempt,
   findCrossLeadSendCollision,
+  getSentSubjectForStage,
   markSendResult,
 } from '../../db/repositories/sentEmailsLogRepository.js';
 import {
@@ -89,6 +90,12 @@ async function composeForLead(lead: LeadRecord, stage: SendableStage): Promise<C
   }
   const categoryServices = SERVICE_CATEGORIES.find((c) => c.slug === category.slug)?.services ?? [];
 
+  // 'followup'/'final' must continue the same email thread the 'new' stage started (see
+  // composerService.ts's subject-override rule) — fetch what that email was actually sent with.
+  // 'new' itself has no prior email to continue, so this is skipped for it.
+  const originalSubject =
+    stage === 'new' ? null : await getSentSubjectForStage(lead.id, 'new');
+
   return composeEmail({
     leadId: lead.id,
     companyName: lead.companyName ?? lead.contactName ?? 'your business',
@@ -97,6 +104,7 @@ async function composeForLead(lead: LeadRecord, stage: SendableStage): Promise<C
     primaryCategoryName: category.name,
     primaryCategoryServices: categoryServices,
     stage,
+    originalSubject,
     unsubscribeUrl: buildUnsubscribeUrl(lead.id),
     whatsappCtaUrl: buildClickToWhatsAppLink(lead.companyName),
   });

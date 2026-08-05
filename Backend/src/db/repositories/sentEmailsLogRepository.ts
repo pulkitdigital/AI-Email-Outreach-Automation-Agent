@@ -181,6 +181,26 @@ export async function listSentEmailLogsForLead(leadId: string): Promise<SentEmai
 }
 
 /**
+ * Subject line of a lead's already-SENT email for a given stage — used so 'followup'/'final'
+ * emails continue the same thread ("Re: <original subject>") instead of composerService
+ * inventing a new subject line for what a recipient will read as one ongoing conversation. Only
+ * a 'sent' row counts (never a 'failed'/'cancelled'/'queued' one) since those never actually
+ * reached the recipient's inbox and so started no real thread to continue.
+ */
+export async function getSentSubjectForStage(
+  leadId: string,
+  stage: SendableStage,
+): Promise<string | null> {
+  const { rows } = await pool.query<{ subject: string }>(
+    `SELECT subject FROM sent_emails_log
+     WHERE lead_id = $1 AND sequence_stage = $2 AND status = 'sent'
+     LIMIT 1`,
+    [leadId, stage],
+  );
+  return rows[0]?.subject ?? null;
+}
+
+/**
  * Defense in depth beyond the (lead_id, sequence_stage) claim above: confirms no OTHER lead
  * row sharing this normalized email has ever been sent anything. Under normal operation this
  * can never trigger — leads.email_normalized is UNIQUE, so two lead rows can't share an email

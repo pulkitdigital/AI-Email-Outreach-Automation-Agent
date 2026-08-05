@@ -35,25 +35,23 @@ vi.mock('../../../storage/index.js', () => ({
   getStorageProvider: getStorageProviderMock,
 }));
 
-const buildDeckForLeadMock = vi.fn();
-vi.mock('../deckBuilder.js', () => ({
-  buildDeckForLead: buildDeckForLeadMock,
-  DECK_TEMPLATE_VERSION: 'v1',
-}));
-
-const convertPptxToPdfMock = vi.fn();
-vi.mock('../pptxToPdf.js', () => ({
-  convertPptxToPdf: convertPptxToPdfMock,
+const buildDeckPdfForLeadMock = vi.fn();
+vi.mock('../pdf/generateDeckPdf.js', () => ({
+  buildDeckPdfForLead: buildDeckPdfForLeadMock,
+  DECK_TEMPLATE_VERSION: 'v2-react-pdf',
 }));
 
 const { triggerDeckGeneration, generateDeckForLead, markDeckGenerationFailed } =
   await import('../deckGenerationService.js');
 const { DeckGenerationPreconditionError } = await import('../errors.js');
 
+const FAKE_PAGE_COUNT = 12;
+
 function baseLead(overrides: Record<string, unknown> = {}) {
   return {
     id: 'lead-1',
     companyName: 'Acme Co',
+    industry: null,
     categoryId: 'cat-web',
     status: 'categorized',
     ...overrides,
@@ -71,8 +69,7 @@ beforeEach(() => {
   enqueueDeckGenerationJobMock.mockReset();
   putObjectMock.mockReset();
   getStorageProviderMock.mockClear();
-  buildDeckForLeadMock.mockReset();
-  convertPptxToPdfMock.mockReset().mockResolvedValue(Buffer.from('pdf-bytes'));
+  buildDeckPdfForLeadMock.mockReset();
 });
 
 describe('triggerDeckGeneration', () => {
@@ -94,7 +91,7 @@ describe('triggerDeckGeneration', () => {
     expect(createPitchDeckMock).toHaveBeenCalledWith({
       leadId: 'lead-1',
       categoryId: 'cat-web',
-      templateVersion: 'v1',
+      templateVersion: 'v2-react-pdf',
     });
     expect(enqueueDeckGenerationJobMock).toHaveBeenCalledWith({
       leadId: 'lead-1',
@@ -108,20 +105,21 @@ describe('generateDeckForLead', () => {
     getLeadByIdMock.mockResolvedValue(baseLead());
     getPitchDeckByIdMock.mockResolvedValue({ id: 'deck-1' });
     getCategoryByIdMock.mockResolvedValue({ id: 'cat-web', slug: 'web-app-solutions' });
-    buildDeckForLeadMock.mockResolvedValue(Buffer.from('pptx-bytes'));
+    buildDeckPdfForLeadMock.mockResolvedValue({
+      buffer: Buffer.from('pdf-bytes'),
+      pageCount: FAKE_PAGE_COUNT,
+    });
 
     await generateDeckForLead('lead-1', 'deck-1');
 
-    expect(buildDeckForLeadMock).toHaveBeenCalledWith({
+    expect(buildDeckPdfForLeadMock).toHaveBeenCalledWith({
       companyName: 'Acme Co',
       primaryCategorySlug: 'web-app-solutions',
+      industry: null,
     });
-    expect(putObjectMock).toHaveBeenCalledWith(
-      'pitch-decks/lead-1/deck-1.pptx',
-      expect.any(Buffer),
-      expect.stringContaining('presentationml'),
-    );
-    expect(convertPptxToPdfMock).toHaveBeenCalledWith(expect.any(Buffer));
+    // Exactly one artifact now — a single PDF upload, recorded under both fileKey and pdfFileKey
+    // (see deckGenerationService.ts's buildStorageKey comment for why).
+    expect(putObjectMock).toHaveBeenCalledTimes(1);
     expect(putObjectMock).toHaveBeenCalledWith(
       'pitch-decks/lead-1/deck-1.pdf',
       expect.any(Buffer),
@@ -135,11 +133,27 @@ describe('generateDeckForLead', () => {
       'deck-1',
       expect.objectContaining({
         status: 'ready',
-        fileKey: 'pitch-decks/lead-1/deck-1.pptx',
+        fileKey: 'pitch-decks/lead-1/deck-1.pdf',
         pdfFileKey: 'pitch-decks/lead-1/deck-1.pdf',
       }),
     );
     expect(updateLeadStatusMock).toHaveBeenCalledWith('lead-1', 'deck_generated');
+  });
+
+  it('passes the lead industry through to the deck builder when present', async () => {
+    getLeadByIdMock.mockResolvedValue(baseLead({ industry: '  Hospitality  ' }));
+    getPitchDeckByIdMock.mockResolvedValue({ id: 'deck-1' });
+    getCategoryByIdMock.mockResolvedValue({ id: 'cat-web', slug: 'web-app-solutions' });
+    buildDeckPdfForLeadMock.mockResolvedValue({
+      buffer: Buffer.from('pdf-bytes'),
+      pageCount: FAKE_PAGE_COUNT,
+    });
+
+    await generateDeckForLead('lead-1', 'deck-1');
+
+    expect(buildDeckPdfForLeadMock).toHaveBeenCalledWith(
+      expect.objectContaining({ industry: 'Hospitality' }),
+    );
   });
 
   it('uses the R2 public URL when configured', async () => {
@@ -147,14 +161,17 @@ describe('generateDeckForLead', () => {
     getLeadByIdMock.mockResolvedValue(baseLead());
     getPitchDeckByIdMock.mockResolvedValue({ id: 'deck-1' });
     getCategoryByIdMock.mockResolvedValue({ id: 'cat-web', slug: 'web-app-solutions' });
-    buildDeckForLeadMock.mockResolvedValue(Buffer.from('pptx-bytes'));
+    buildDeckPdfForLeadMock.mockResolvedValue({
+      buffer: Buffer.from('pdf-bytes'),
+      pageCount: FAKE_PAGE_COUNT,
+    });
 
     await generateDeckForLead('lead-1', 'deck-1');
 
     expect(updatePitchDeckStatusMock).toHaveBeenCalledWith(
       'deck-1',
       expect.objectContaining({
-        fileUrl: 'https://cdn.example.com/pitch-decks/lead-1/deck-1.pptx',
+        fileUrl: 'https://cdn.example.com/pitch-decks/lead-1/deck-1.pdf',
         pdfFileUrl: 'https://cdn.example.com/pitch-decks/lead-1/deck-1.pdf',
       }),
     );
@@ -164,7 +181,10 @@ describe('generateDeckForLead', () => {
     getLeadByIdMock.mockResolvedValue(baseLead());
     getPitchDeckByIdMock.mockResolvedValue({ id: 'deck-1' });
     getCategoryByIdMock.mockResolvedValue({ id: 'cat-web', slug: 'web-app-solutions' });
-    buildDeckForLeadMock.mockResolvedValue(Buffer.from('pptx-bytes'));
+    buildDeckPdfForLeadMock.mockResolvedValue({
+      buffer: Buffer.from('pdf-bytes'),
+      pageCount: FAKE_PAGE_COUNT,
+    });
 
     await generateDeckForLead('lead-1', 'deck-1');
 
@@ -172,7 +192,7 @@ describe('generateDeckForLead', () => {
       'deck-1',
       expect.objectContaining({
         fileUrl: '/api/decks/deck-1/download',
-        pdfFileUrl: '/api/decks/deck-1/download?format=pdf',
+        pdfFileUrl: '/api/decks/deck-1/download',
       }),
     );
   });
@@ -181,50 +201,46 @@ describe('generateDeckForLead', () => {
     getLeadByIdMock.mockResolvedValue(baseLead({ status: 'in_sequence' }));
     getPitchDeckByIdMock.mockResolvedValue({ id: 'deck-1' });
     getCategoryByIdMock.mockResolvedValue({ id: 'cat-web', slug: 'web-app-solutions' });
-    buildDeckForLeadMock.mockResolvedValue(Buffer.from('pptx-bytes'));
+    buildDeckPdfForLeadMock.mockResolvedValue({
+      buffer: Buffer.from('pdf-bytes'),
+      pageCount: FAKE_PAGE_COUNT,
+    });
 
     await generateDeckForLead('lead-1', 'deck-1');
 
     expect(updateLeadStatusMock).not.toHaveBeenCalled();
   });
 
-  it('marks the pitch deck failed and rethrows when the build fails, without touching lead status', async () => {
+  it('marks the pitch deck failed and rethrows when the PDF build fails, without touching lead status', async () => {
     getLeadByIdMock.mockResolvedValue(baseLead());
     getPitchDeckByIdMock.mockResolvedValue({ id: 'deck-1' });
     getCategoryByIdMock.mockResolvedValue({ id: 'cat-web', slug: 'web-app-solutions' });
-    buildDeckForLeadMock.mockRejectedValue(new Error('pptxgenjs exploded'));
+    buildDeckPdfForLeadMock.mockRejectedValue(new Error('react-pdf exploded'));
 
-    await expect(generateDeckForLead('lead-1', 'deck-1')).rejects.toThrow('pptxgenjs exploded');
+    await expect(generateDeckForLead('lead-1', 'deck-1')).rejects.toThrow('react-pdf exploded');
 
     expect(updatePitchDeckStatusMock).toHaveBeenCalledWith('deck-1', {
       status: 'failed',
-      generationError: 'pptxgenjs exploded',
+      generationError: 'react-pdf exploded',
     });
     expect(updateLeadStatusMock).not.toHaveBeenCalled();
   });
 
-  it('marks the pitch deck failed and rethrows when PDF conversion fails, without touching lead status or advancing past pptx upload', async () => {
+  it('marks the pitch deck failed and rethrows when upload fails, without ever reaching ready', async () => {
     getLeadByIdMock.mockResolvedValue(baseLead());
     getPitchDeckByIdMock.mockResolvedValue({ id: 'deck-1' });
     getCategoryByIdMock.mockResolvedValue({ id: 'cat-web', slug: 'web-app-solutions' });
-    buildDeckForLeadMock.mockResolvedValue(Buffer.from('pptx-bytes'));
-    convertPptxToPdfMock.mockRejectedValue(new Error('LibreOffice (soffice) was not found'));
+    buildDeckPdfForLeadMock.mockResolvedValue({
+      buffer: Buffer.from('pdf-bytes'),
+      pageCount: FAKE_PAGE_COUNT,
+    });
+    putObjectMock.mockRejectedValue(new Error('R2 upload failed'));
 
-    await expect(generateDeckForLead('lead-1', 'deck-1')).rejects.toThrow(
-      'LibreOffice (soffice) was not found',
-    );
+    await expect(generateDeckForLead('lead-1', 'deck-1')).rejects.toThrow('R2 upload failed');
 
-    // The pptx itself still got built and uploaded — only the PDF step failed — but the deck as
-    // a whole is correctly marked failed regardless, never left dangling as 'generating' or
-    // silently marked 'ready' without a PDF for sendingService.ts to attach.
-    expect(putObjectMock).toHaveBeenCalledWith(
-      'pitch-decks/lead-1/deck-1.pptx',
-      expect.any(Buffer),
-      expect.stringContaining('presentationml'),
-    );
     expect(updatePitchDeckStatusMock).toHaveBeenCalledWith('deck-1', {
       status: 'failed',
-      generationError: 'LibreOffice (soffice) was not found',
+      generationError: 'R2 upload failed',
     });
     expect(updatePitchDeckStatusMock).not.toHaveBeenCalledWith(
       'deck-1',

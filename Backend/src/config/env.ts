@@ -72,6 +72,13 @@ const envSchema = z.object({
   BREVO_INBOUND_WEBHOOK_SECRET: z.string().optional(),
   BREVO_INBOUND_WEBHOOK_URL: z.string().optional(),
 
+  // The real person outreach reads as being from — used as the email sign-off (see
+  // modules/emailComposer/emailTemplate.ts) and folded into the Brevo "From" display name (see
+  // providers/email/BrevoProvider.ts, e.g. "Pulkit from BeBeyond"). A bare company-name sign-off
+  // reads as agency/bulk mail and is part of what pushes cold outreach into Gmail's Promotions
+  // tab — see Docs/ARCHITECTURE.md § 4 for the tone rationale.
+  SENDER_PERSON_NAME: z.string().default('Pulkit'),
+
   // Phase 4 — this backend's own internet-facing URL, used to build links embedded in
   // outbound emails (unsubscribe). Must be reachable by real recipients, not just localhost,
   // once real sending starts.
@@ -85,6 +92,14 @@ const envSchema = z.object({
   EMAIL_SEND_RATE_LIMIT_MAX: z.coerce.number().default(5),
   EMAIL_SEND_RATE_LIMIT_DURATION_MS: z.coerce.number().default(1000),
 
+  // Spreads a day's automated sends (scheduler-enqueued only — manual "Send Now" from the
+  // dashboard is unaffected) across a randomized window instead of firing them back-to-back at
+  // SCHEDULER_CRON time — see modules/scheduler/sendSpread.ts. 0 disables spreading (every job
+  // gets delay=0, i.e. today's current burst behavior). This is independent of, and composes
+  // with, EMAIL_SEND_RATE_LIMIT_MAX/DURATION_MS — that still governs how fast eligible jobs
+  // actually drain once each one's spread delay has elapsed.
+  SEND_SPREAD_WINDOW_HOURS: z.coerce.number().default(4),
+
   // TODO: fill in once Google Workspace access on bebeyond.digital is resolved
   GMAIL_CLIENT_ID: z.string().optional(),
   GMAIL_CLIENT_SECRET: z.string().optional(),
@@ -96,6 +111,24 @@ const envSchema = z.object({
   GMAIL_PUBSUB_SUBSCRIPTION: z.string().optional(),
 
   DAILY_EMAIL_LIMIT: z.coerce.number().default(300),
+
+  // Sending-domain warm-up ramp (bebeyond.digital has no prior sending history) — see
+  // modules/scheduler/warmup.ts's computeEffectiveDailyLimit, which the scheduler uses in place
+  // of reading DAILY_EMAIL_LIMIT directly. Disabled by default so an existing/warmed-up
+  // deployment's behavior is unchanged unless explicitly opted into.
+  WARMUP_ENABLED: z
+    .string()
+    .default('false')
+    .transform((v) => v === 'true'),
+  // YYYY-MM-DD, in SCHEDULER_TIMEZONE (same date format as daily_summary.run_date). Required
+  // when WARMUP_ENABLED=true — checked at point of use (computeEffectiveDailyLimit), not at
+  // boot, matching the lazy-fail pattern other optional-until-used secrets follow.
+  WARMUP_START_DATE: z.string().optional(),
+  WARMUP_START_LIMIT: z.coerce.number().default(25),
+  // Multiplicative growth per WARMUP_GROWTH_INTERVAL_DAYS — 1.2 = +20%.
+  WARMUP_GROWTH_RATE: z.coerce.number().default(1.2),
+  WARMUP_GROWTH_INTERVAL_DAYS: z.coerce.number().default(3),
+
   SCHEDULER_TIMEZONE: z.string().default('Asia/Kolkata'),
   // Cron expression (evaluated in SCHEDULER_TIMEZONE) for the once-daily automated run — see
   // modules/scheduler/dailySchedulerService.ts and queue/workers/schedulerWorker.ts. Default:

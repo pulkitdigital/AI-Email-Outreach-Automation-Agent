@@ -88,9 +88,16 @@ decksRouter.get('/:id', async (req, res) => {
 
 /**
  * Provider-agnostic download: works whether the file lives in R2 or local disk (see
- * storage/index.ts). Defaults to the .pptx; `?format=pdf` serves the LibreOffice-converted
- * rendering instead (see deckGenerationService.ts / pptxToPdf.ts) — same pattern
- * resolveFileUrl's local-dev fallback URL relies on.
+ * storage/index.ts). `?format=pdf` picks pdfFileKey, otherwise fileKey — same two-column shape
+ * pitch_decks has always had (see pitchDecksRepository.ts).
+ *
+ * Since the react-pdf pipeline (deckGenerationService.ts) now writes the SAME generated PDF under
+ * both fileKey and pdfFileKey (there's only one artifact anymore — no separate .pptx), this route
+ * no longer assumes the non-pdf branch means "pptx": the actual Content-Type/filename extension
+ * is derived from the resolved fileKey's own extension, not from the `wantsPdf` flag. That keeps
+ * both the default link and `?format=pdf` correct for decks generated under the new pipeline
+ * (both branches resolve to the same .pdf key) AND for any deck generated before this migration
+ * (fileKey still genuinely ends in .pptx there) — no data migration needed for either case.
  */
 decksRouter.get('/:id/download', async (req, res) => {
   try {
@@ -112,15 +119,16 @@ decksRouter.get('/:id/download', async (req, res) => {
     const storage = getStorageProvider();
     const buffer = await storage.getObject(fileKey);
 
+    const isPdf = fileKey.toLowerCase().endsWith('.pdf');
     res.setHeader(
       'Content-Type',
-      wantsPdf
+      isPdf
         ? 'application/pdf'
         : 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     );
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="pitch-deck-${deck.id}.${wantsPdf ? 'pdf' : 'pptx'}"`,
+      `attachment; filename="pitch-deck-${deck.id}.${isPdf ? 'pdf' : 'pptx'}"`,
     );
     res.send(buffer);
   } catch (err) {

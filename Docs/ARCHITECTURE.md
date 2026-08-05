@@ -117,66 +117,89 @@ plus up to 2 secondary categories, via a hybrid rule-based + AI engine.
   manually re-categorized — only its category/confidence fields refresh, so re-running
   categorization after a rule change can't silently reset pipeline progress.
 
-## 3. Deck Generation Layer — implemented (Phase 3)
+## 3. Deck Generation Layer — implemented (Phase 3, re-platformed on `@react-pdf/renderer`)
 
-**Responsibility:** produce a personalized PPTX pitch deck per lead, tailored to the lead's
+**Responsibility:** produce a personalized PDF pitch deck per lead, tailored to the lead's
 primary category, and store it durably.
 
 - **Template-based, not AI-generated.** Phase 0's doc speculated an AI-tailored-copy approach;
-  what Phase 3 actually needed (per the explicit requirement) is structural personalization —
-  company name in the opening/closing slides, the "Our Services" section reordered/highlighted
-  by category — not novel per-lead prose. So this layer makes **no AI provider call at all**: it
-  builds a 12-slide deck with `pptxgenjs` from static content extracted from the reference deck
-  (`NEW_PITCH_DECK.pdf`) plus the two personalized slides. See `Backend/src/modules/deckGeneration/`:
-  - `brand.ts` — colors pixel-sampled from the reference deck's logo asset (`#FB8500` orange,
-    `#219EBC` teal — more precise than the "-ish" hex values originally proposed).
-  - `staticContent.ts` / `serviceCatalog.ts` — copy extracted verbatim from the reference deck.
-  - `slides/*.ts` — one module per slide, each a pure `(slide, ctx) => void` function, so
-    templates/branding can be revised slide-by-slide without touching the orchestrator.
-  - `deckBuilder.ts` — assembles all 12 slides into a `Buffer` (`pptx.write({ outputType:
-'nodebuffer' })`).
-- **Personalization**: `coverSlide.ts` and `thankYouSlide.ts` insert the lead's company name;
-  `ourServicesSlide.ts` calls the pure, unit-tested `orderCategoriesForLead()` to move the
-  lead's primary category card to the front and visually highlight it ("Recommended For You"
-  badge, thicker border) — the other 3 categories keep their original relative order. Every
-  other slide (About Us, Our Story, Success Stories, How Can We Help, Technology Solutions,
-  Creative Services detail, Why Choose Us, How We Work, Major Wins, contact info) is byte-for-
-  byte identical across every deck.
-- **Known simplifications** (no image assets were available to embed losslessly): client logos
-  on the Success Stories slide render as a name-badge grid instead of actual logo images; the
-  circular "Our Story" founder-journey diagram renders as a numbered grid instead of a literal
-  circular layout with connector arcs. Both are flagged in code comments as easy to upgrade once
-  logo/graphic assets exist — the modular slide-per-file structure means swapping either one out
-  doesn't touch anything else.
-- **Trigger**: `categorizationService.categorizeLead()` calls `deckGenerationService.
-triggerDeckGeneration()` whenever categorization actually _changes_ the lead's primary
-  category (first-time categorization, or a correction — never a no-op re-confirmation, and
-  never when the outcome is `needs_review`). `triggerDeckGeneration()` validates the lead has a
-  category, creates the `pitch_decks` row (`generation_status = 'pending'`), and enqueues the
-  job — all _before_ returning, so the worker always has an existing row to progress through
-  `pending → generating → ready/failed`, including across retries. Manual regeneration
-  (`POST /api/decks/leads/:id/regenerate`) goes through the exact same function.
-- **Decoupling — "must not crash the pipeline that triggered it"**: deck generation runs on its
-  own BullMQ queue/worker (`deck-generation`, `Backend/src/queue/workers/deckGenerationWorker.ts`),
-  a separate process context from the categorization worker. `maybeTriggerDeckGeneration()` in
-  categorizationService wraps the trigger call in try/catch and only logs on failure — even
-  failing to _enqueue_ a deck job can't fail the categorization job that triggered it, and
-  actual generation/upload failures happen in an entirely different job that can only fail
-  itself.
-- **Error handling**: on any failure (bad template data, storage upload failure), the worker
-  retries via BullMQ backoff (3 attempts); each attempt updates `pitch_decks.generation_status`
-  to `failed` with `generation_error` (so a currently-failed state is always visible, not
-  swallowed), and only once retries are exhausted does the _lead_ also move to `needs_review`
-  (`review_reason = 'deck_generation_failed'`) — flagging it for manual regeneration, per the
-  requirement. A lead with no category yet (`DeckGenerationPreconditionError`) skips retries
-  entirely, same non-retryable pattern as `AIConfigError` in categorization. Non-regressive: a
-  lead already past `categorized` (e.g. `in_sequence`) never has its status touched by a deck
-  failure or even a successful regeneration — only `pitch_decks` reflects the outcome.
-- **Storage**: uploaded via the Phase 1 `StorageProvider` abstraction (R2 in production, local
-  disk in dev) under `pitch-decks/{leadId}/{pitchDeckId}.pptx`. `pitch_decks.file_url` resolves
-  to the R2 public URL when `R2_PUBLIC_URL` is configured, otherwise falls back to this
-  backend's own `GET /api/decks/:id/download` route — provider-agnostic either way.
+  what this layer actually needs (per the explicit requirement) is structural personalization —
+  company name in the opening/closing slides, an "industry" subtitle when known, the "Our
+  Services" section reordered/highlighted by category — not novel per-lead prose. So this layer
+  makes **no AI provider call at all**.
+- **Renders a PDF directly — no LibreOffice, no system binaries.** The original Phase 3
+  implementation built a `.pptx` with `pptxgenjs` and converted it to `.pdf` at generation time
+  via a `soffice --headless` shell-out (LibreOffice), which meant the production worker needed
+  LibreOffice installed via `apt-get` (see `render.yaml`'s git history) and carried real
+  deployment risk (a missing/mismatched system binary, font-substitution differences between
+  dev and Render's Linux container). That two-step pipeline has been **replaced**: the deck is
+  now rendered straight to a PDF buffer with `@react-pdf/renderer`, a pure-JS library — no shell
+  process, no system dependency, nothing for Render's build to `apt-get install`. See
+  `Backend/src/modules/deckGeneration/pdf/`:
+  - `theme.ts` — colors/fonts/spacing/page-size tokens, re-exported from `../brand.ts` (the
+    single source of truth for brand values, shared with the old pptxgenjs code below).
+  - `fonts.ts` — registers the real Bricolage Grotesque / Public Sans font files (via the
+    `@fontsource/bricolage-grotesque` / `@fontsource/public-sans` npm packages, which ship actual
+    `.ttf`/`.woff` files in `node_modules` — no runtime network fetch, no third-party font CDN).
+  - `icons.tsx` — simple inline SVG icons (arrow-up-trend, gear, megaphone, handshake, star, etc.)
+    drawn as basic shapes, not sourced image/icon-font assets.
+  - `slides/*.tsx` — one React component per slide (12 total), composed into a single
+    `DeckDocument.tsx`.
+  - `generateDeckPdf.ts` — `buildDeckPdfForLead(ctx)`, the single entrypoint: registers fonts,
+    renders `<DeckDocument ctx={ctx} />` via `renderToBuffer()`, returns `{ buffer, pageCount }`.
+  - `brand.ts`'s colors were re-verified directly against a newer reference PDF
+    (`Docs/design-reference/pitch-deck-reference.pdf`) using `pdfplumber` to sample real vector
+    and character fill colors, not eyeballed off a logo asset: `#FB8500` orange and `#219EBC`
+    teal (headings/text) were confirmed exact; a second, distinct muted teal `#2793AD`
+    (`tealShape`, used for shape fills like underline bars) was newly identified and added;
+    `cream`/`tealPale` were corrected to their verified exact values.
+  - `staticContent.ts` was diffed against that same newer reference and corrected where the
+    older extraction was stale: the Success Stories client list grew from 18 to a verified
+    23 real names (5 were previously missing entirely, one was misspelled), and two slides
+    ("Our Services", the merged Creative Services detail) gained subtitle lines that exist in
+    the reference but weren't previously captured. Every other section (About Us, founder
+    journey, benefit cards, service catalog, comparison table, testimonials) was confirmed
+    unchanged/accurate against the newer reference.
+- **Personalization**: the Cover slide inserts the lead's company name (`"Prepared for
+  {companyName}"`) and, when the lead's `industry` field is populated, a short secondary line;
+  the Thank You slide echoes the company name in its closing line; the "Our Services" slide
+  reuses the pure, unit-tested `orderCategoriesForLead()` (`serviceCatalog.ts`, unchanged by the
+  re-platforming) to move the lead's primary category card to the front and visually highlight
+  it ("Recommended For You" badge, tinted background). An unrecognized/missing category slug
+  degrades gracefully — no highlight, no crash, categories keep their default order. Every other
+  slide is identical across every deck.
+- **Known simplifications** (no image assets were available to embed losslessly): client names
+  on the Success Stories slide render as a typographic name grid instead of actual logo images;
+  the circular "Our Story" founder-journey diagram renders as a numbered list instead of a
+  literal circular layout with connector arcs; testimonials render as typed quote-cards instead
+  of the reference's chat/review screenshots (quote text verified verbatim against the real,
+  longer reviews).
+- **Trigger, decoupling, error handling, and storage-provider abstraction are unchanged** from
+  the original Phase 3 design (see below) — only the actual rendering step changed:
+  `categorizationService.categorizeLead()` calls `deckGenerationService.triggerDeckGeneration()`
+  whenever categorization actually _changes_ the lead's primary category; deck generation runs
+  on its own BullMQ queue/worker (`deck-generation`,
+  `Backend/src/queue/workers/deckGenerationWorker.ts`) so a rendering failure can never crash the
+  categorization job that triggered it; on failure the worker retries via BullMQ backoff (3
+  attempts), each attempt updating `pitch_decks.generation_status`/`generation_error`, and only
+  once retries are exhausted does the lead move to `needs_review`
+  (`review_reason = 'deck_generation_failed'`).
+- **Storage — one artifact now, not two.** The old pipeline produced both a `.pptx` and a
+  LibreOffice-converted `.pdf`, stored under `pitch_decks.file_key`/`file_url` (pptx) and
+  `pdf_file_key`/`pdf_file_url` (pdf) respectively. Since generation now produces exactly one
+  PDF, the same generated bytes are uploaded once and recorded under **both** column pairs
+  (`generateDeckPdf`'s single output written to both `fileKey`/`fileUrl` and
+  `pdfFileKey`/`pdfFileUrl`) — every existing reader (the sending engine's attachment logic, the
+  dashboard's download links) keeps working unchanged, and no DB migration was needed to merge
+  the now-redundant columns (left as a deliberate future cleanup, not bundled into the
+  re-platforming). Uploaded via the Phase 1 `StorageProvider` abstraction (R2 in production,
+  local disk in dev) under `pitch-decks/{leadId}/{pitchDeckId}.pdf`.
 - On success, `leads.status` moves `categorized` → `deck_generated`.
+- **The old pptxgenjs + LibreOffice code (`deckBuilder.ts`, `pptxToPdf.ts`,
+  `slides/*.ts` at the top level of `deckGeneration/`) is still present in the repo but no longer
+  called by anything** — `deckGenerationService.ts` imports only from `pdf/generateDeckPdf.ts`.
+  Left in place rather than deleted since removing ~15 files is a deliberate, separate cleanup
+  decision, not something to bundle silently into a rendering-engine swap.
 
 ## 4. Email Composer — implemented (Phase 4)
 
@@ -187,20 +210,41 @@ provider-agnostically, before handing off to the Sending Engine.
   calls `AIProvider.generateEmailCopy()` (implemented for real in Phase 4 — both Gemini and
   OpenAI, mirroring categorizeLead's pattern) for subject + body paragraphs only — the model
   never touches structural HTML. `emailTemplate.ts` wraps whatever copy it gets (AI or fallback)
-  in a fixed shell: greeting, paragraphs, signature block (`BeBeyond Digital Solutions,
-info@bebeyond.digital, +91 99 1867 1867`), and an unsubscribe footer — **always present**,
-  regardless of what the copy source produced. All interpolated text (AI output, lead-controlled
-  fields like company/contact name) is HTML-escaped (`escapeHtml()`), since ingested lead data
-  is untrusted input being inserted into HTML.
+  in a fixed shell: greeting, paragraphs, signature block, and an unsubscribe footer — **always
+  present**, regardless of what the copy source produced. All interpolated text (AI output,
+  lead-controlled fields like company/contact name) is HTML-escaped (`escapeHtml()`), since
+  ingested lead data is untrusted input being inserted into HTML.
+- **Sign-off is a person, not just the company** (deliverability fix — a bare company-name
+  sign-off reads as agency/bulk mail, one factor pushing cold outreach into Gmail's Promotions
+  tab). The signature block is `{SENDER_PERSON_NAME}` on its own line, then `BeBeyond Digital
+  Solutions`, then contact info — never the company name alone. `SENDER_PERSON_NAME` (env var,
+  default `Pulkit`) is enforced structurally in `emailTemplate.ts`, not left to the AI to
+  remember, and is also folded into `BrevoProvider`'s "From" display name (e.g. "Pulkit from
+  BeBeyond") for the same reason.
 - **AI failure falls back to a static template, never blocks a send.** If `generateEmailCopy()`
   throws for any reason, `composerService.ts` catches it, logs a warning, and uses
   `fallbackTemplates.ts` — on-brand, honest copy per stage that never claims anything false
-  (e.g. never says "attached" when nothing is attached this phase).
+  (e.g. never says "attached" when nothing is attached this phase). The fallback templates carry
+  the same first-person, no-agency-boilerplate tone rules as the AI prompt (below), so an AI
+  outage can't silently revert a send to the old promotional-sounding copy.
 - **Per-stage tone**, encoded in the shared prompt (`Backend/src/providers/ai/prompts/emailCopy.ts`):
-  `new` introduces BeBeyond and the lead's primary category; `followup` (day 3) references the
+  `new` introduces the sender and the lead's primary category; `followup` (day 3) references the
   prior email without repeating the full pitch; `final` (day 7) is a clear, polite, low-pressure
   close. Positioning baked into every prompt: "your digital partner, not a typical agency —
-  transparent pricing, real results, long-term support."
+  transparent pricing, real results, long-term support." The prompt carries explicit hard rules
+  (first-person only, never "At BeBeyond, we..."; never open with "I came across [Company] while
+  researching..." — reference the lead's actual category/industry data instead; follow-ups must
+  vary their closing phrase rather than reusing stock lines like "close the loop" or "won't
+  follow up further") plus two real few-shot examples modeling the target voice — added because
+  an earlier, unguided version of this prompt reliably produced generic-sounding agency-pitch
+  copy that read as promotional rather than a 1:1 email.
+- **Follow-up/final subjects continue the same thread, deterministically.** Rather than letting
+  the AI (or the fallback template) invent a new subject line for a `followup`/`final` email,
+  `composerService.ts` always overrides it to `Re: {the actual subject the 'new' email was sent
+  with}` when that's available — fetched via `sentEmailsLogRepository.getSentSubjectForStage()`
+  and passed through by `sendingService.ts`'s `composeForLead()`. This is enforced in code, not
+  left as a prompt instruction, so a recipient's inbox always shows one continuing conversation
+  for a given lead, never three unrelated-looking emails.
 - **Unsubscribe link**: stateless, HMAC-signed (`modules/emailComposer/unsubscribeToken.ts`) —
   `token = HMAC-SHA256(UNSUBSCRIBE_SECRET, leadId)`, verified with `timingSafeEqual`. No DB
   column or lookup needed. `GET /unsubscribe/:leadId/:token` (public, clicked from an email
@@ -415,18 +459,34 @@ stage_final_sent_at IS NULL AND stage_final_scheduled_at <= now()`. `stage_final
    `'deck_generated'` alone already means categorized + deck ready + never emailed + not
    opted-out/bounced/replied, since those are all mutually exclusive `leads.status` values —
    no additional filtering needed.
-5. **300/day cap** (`DAILY_EMAIL_LIMIT`), follow-ups + finals always win in full:
+5. **Daily cap**, follow-ups + finals always win in full:
    `alreadyClaimedToday = countSentToday(dayStart, dayEnd)` (day boundary computed in
    `SCHEDULER_TIMEZONE`, see `dailySummaryRepository.getDayBoundsInSchedulerTimezone`) →
    `priorityCount = dueFollowups.length + dueFinals.length` → if
-   `alreadyClaimedToday + priorityCount > DAILY_EMAIL_LIMIT`, **all** deadline-bound emails are
+   `alreadyClaimedToday + priorityCount > limit`, **all** deadline-bound emails are
    still queued (never silently dropped) and `priority_exceeded_cap` is logged `true` with a
    warning; new-lead queueing gets whatever's left (`max(0, limit − alreadyClaimedToday −
-priorityCount)`), possibly zero.
+priorityCount)`), possibly zero. The cap itself is `DAILY_EMAIL_LIMIT` (default 300), **unless**
+   the sending-domain warm-up ramp is enabled (`WARMUP_ENABLED=true` — `bebeyond.digital` has no
+   prior sending history, so starting at full volume immediately is a deliverability risk):
+   `computeEffectiveDailyLimit(runDate)` (`modules/scheduler/warmup.ts`) then substitutes a
+   smaller, growing limit instead — `WARMUP_START_LIMIT * WARMUP_GROWTH_RATE ^
+   floor(daysSinceWarmupStart / WARMUP_GROWTH_INTERVAL_DAYS)`, capped at `DAILY_EMAIL_LIMIT` once
+   the ramp reaches it. Deliberately a pure function of `(runDate, env config)` — no DB row, no
+   persisted "day N of warmup" counter — so a process restart or a re-triggered run can never
+   desync the ramp from reality; the same calendar date always produces the same effective limit.
+   Disabled by default (`WARMUP_ENABLED=false`), so an existing/already-warmed-up deployment's
+   behavior is unchanged unless explicitly opted in.
 6. **Enqueue** — each selected lead is enqueued via the existing Phase 4 `enqueueSendEmailJob()`
-   (`email-send` queue) exactly as `POST /api/sending/leads/:id/send-now` does manually. Nothing
-   about the sending engine itself needed to change for automation — the scheduler is just
-   another caller of the same queue.
+   (`email-send` queue) exactly as `POST /api/sending/leads/:id/send-now` does manually. Every
+   scheduler-enqueued job (not a manual "Send Now") also gets a random `delayMs`, uniformly
+   distributed across `SEND_SPREAD_WINDOW_HOURS` (`computeSendSpreadDelayMs()`,
+   `modules/scheduler/sendSpread.ts`) — spreading a day's sends across a window instead of firing
+   them all back-to-back at `SCHEDULER_CRON` time, since real human-paced sending isn't evenly
+   spaced either. `SEND_SPREAD_WINDOW_HOURS=0` disables spreading (every job gets `delayMs: 0`,
+   today's send-now-style burst behavior). Independent of, and composes with,
+   `EMAIL_SEND_RATE_LIMIT_MAX`/`_DURATION_MS`, which still governs how fast eligible jobs drain
+   once each one's spread delay has elapsed.
 7. **`daily_summary` audit row** — one row per `run_date` (upserted, see `recordSchedulerRun`):
    queued counts per stage (this run's own snapshot — overwritten on re-run, not summed),
    `skipped_reply`/`skipped_bounce`/`skipped_optout` (from
@@ -601,12 +661,23 @@ Engine's error handling section above.
 
 ## Deployment
 
-- **Backend + workers**: Node/Express API and BullMQ workers deployed to Railway, sharing the
-  same codebase/process group as configured (separate Railway services for API vs. workers is a
-  Phase-1+ operational decision, not a schema/architecture one).
-- **Dashboard**: Next.js (App Router) deployed to Railway separately, talking to the backend via
-  `NEXT_PUBLIC_API_URL`. **Implemented (Phase 6)** — see § 7.
-- **Postgres + Redis**: Railway-managed instances in production; `docker-compose.yml` provides
-  the equivalent locally for development.
+- **Backend + workers**: Node/Express API (`bebeyond-backend-api`) and BullMQ workers
+  (`bebeyond-backend-worker`) deployed to **Render** (see repo-root `render.yaml`) as two
+  separate services on Render's native Node runtime (not Docker), both on the `starter` plan,
+  Singapore region, sharing one env var group so Backend variables are defined once. Both
+  services' `buildCommand` is plain `npm install && npm run build:shared && npm run build
+  --workspace=Backend` — **no `apt-get`/system-package install step exists**, since the deck
+  pipeline is pure JS (`@react-pdf/renderer`, see § 3) and needs no LibreOffice or other system
+  binary. An earlier revision of this file did `apt-get install libreoffice-impress` plus font
+  packages specifically for the old pptxgenjs+LibreOffice deck pipeline; that line was removed
+  once the deck pipeline was re-platformed, since there's nothing left to install for that step.
+- **Dashboard**: Next.js (App Router) deployed to Vercel separately (see repo-root
+  `vercel.json`), talking to the backend via `NEXT_PUBLIC_API_URL`. **Implemented (Phase 6)** —
+  see § 7.
+- **Postgres**: [Neon](https://neon.tech) (cloud, `DATABASE_URL`). **Redis**:
+  [Upstash](https://upstash.com) (cloud, `REDIS_URL`, `rediss://` for TLS). Both used identically
+  in local dev and production — `docker-compose.yml` provides local Postgres/Redis containers as
+  an optional alternative for local dev only, never used in production.
 - **File storage**: Cloudflare R2 (S3-compatible) for generated decks, accessed via the S3 API
-  from the backend — no code-level Railway dependency.
+  from the backend (`STORAGE_PROVIDER=r2` in production; ephemeral Render disk means `local`
+  storage would lose every deck on redeploy) — no code-level platform dependency.

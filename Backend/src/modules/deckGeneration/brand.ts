@@ -1,24 +1,37 @@
 /**
- * Brand constants extracted from the reference deck (NEW_PITCH_DECK.pdf, provided 2026-07-31)
- * and pixel-sampled from its accompanying logo asset (Pitch Deck Design.png) — the two solid
- * fills accounting for the vast majority of non-white pixels are #FB8500 and #219EBC, so those
- * are treated as the canonical brand colors rather than the "-ish" values initially proposed.
- * Tints/pale backgrounds below are visual approximations (the reference deck's page
- * backgrounds weren't separately pixel-sampled) — flagged here so they're easy to correct.
+ * Brand constants verified directly against the real reference file
+ * (Docs/design-reference/pitch-deck-reference.pdf, 13 pages, 1440x810pt) using pdfplumber —
+ * vector fill colors and character fill colors were sampled and hex-converted across the whole
+ * deck, not eyeballed off a logo asset. The two dominant solid fills are #FB8500 (882+ character
+ * occurrences) and #219EBC, so those remain the canonical brand colors; `tealShape`, `tealPale`,
+ * `palerBlue`, `cream`, `navy`, and `textMuted` below were previously approximated/guessed and
+ * have now been corrected (or newly added) to their verified exact values.
  *
- * pptxgenjs wants hex strings WITHOUT a leading '#'.
+ * pptxgenjs wants hex strings WITHOUT a leading '#' — that's why these stay bare hex rather than
+ * CSS-style '#RRGGBB'. The react-pdf pipeline (pdf/theme.ts) re-exports these with a '#' prefix
+ * for its own use rather than changing the format here, so the pptxgenjs slide builders (still
+ * present, just unwired — see deckGenerationService.ts) keep compiling unchanged.
  */
 export const BRAND_COLORS = {
+  /** Dominant brand orange — headings, emphasis, borders, badges, bold body text. */
   orange: 'FB8500',
+  /** Dominant brand teal — headings/wordmark text ("Beyond", section headings like "About Us"). */
   teal: '219EBC',
-  /** Pixel-sampled light accent from the logo mark. */
+  /** Distinct, slightly muted/darker teal used specifically for shape fills (e.g. the underline bar beneath section headings like "Success Stories"/"Major Wins") — genuinely different from `teal`, not a rounding artifact. */
+  tealShape: '2793AD',
+  /** Pixel-sampled light accent from the logo mark (not separately re-verified against the reference PDF; kept for the one existing consumer, whyChooseUsSlide.ts's table border). */
   tealLight: '90CFDE',
-  /** Pixel-sampled pale tint from the logo mark — used for soft card/section backgrounds. */
-  tealPale: 'C8E7EF',
-  /** Approximate warm off-white seen behind the About Us / How Can We Help cards. */
-  cream: 'FFF8EF',
+  /** Pale teal tint background. */
+  tealPale: 'CBF3F0',
+  /** Secondary pale-blue tint background — use for an alternate card/section background distinct from tealPale/cream. */
+  palerBlue: 'E5F2FF',
+  /** Warm off-white card background — e.g. the "About Us" card (cream fill, ~4pt orange border, ~24pt corner radius). */
+  cream: 'FFF8F0',
+  /** Dark navy — available as a dark accent if a component needs a dark background/text variant; not forced in anywhere it isn't needed. */
+  navy: '002357',
+  black: '000000',
   textDark: '2B2B2B',
-  textMuted: '5A5A5A',
+  textMuted: '545454',
   white: 'FFFFFF',
 } as const;
 
@@ -37,6 +50,19 @@ export const BRAND_COLORS = {
  * evaluated and not worth the complexity/fragility for this deck (see deckGenerationService.ts
  * for where that step would slot in, if ever needed); recipients who need pixel-exact
  * typography should install both fonts locally.
+ *
+ * This limitation also applies to the server-side .pptx -> .pdf conversion (pptxToPdf.ts,
+ * production only): the Render worker's LibreOffice install (render.yaml) does NOT include
+ * either font — neither is an apt-installable Debian/Ubuntu package, and downloading font files
+ * from a third-party repo into every production build was judged too fragile for the payoff (see
+ * render.yaml's comment for the full reasoning) — so LibreOffice substitutes its own fallback
+ * (typically Liberation Sans, which render.yaml installs explicitly so the substitution is at
+ * least a clean, well-hinted font rather than whatever happens to be present) when rendering the
+ * PDF that actually gets attached and emailed to leads. This is an accepted trade-off, not an
+ * oversight: every slide's copy is fixed, previously-tuned static text (staticContent.ts)
+ * EXCEPT the lead's company name (coverSlide.ts, thankYouSlide.ts), which is the one place a
+ * substituted font's different character widths could plausibly push text past its box — those
+ * two text boxes use pptxgenjs's `fit: 'shrink'` specifically to absorb that risk.
  */
 export const BRAND_FONT_HEADING = 'Bricolage Grotesque';
 export const BRAND_FONT_BODY = 'Public Sans';

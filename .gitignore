@@ -41,3 +41,4 @@ Backend/secrets/
 
 # Redis / Postgres local volumes (if bind-mounted instead of named volumes)
 .docker-data/
+.json/

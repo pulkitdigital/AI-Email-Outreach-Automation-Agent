@@ -99,17 +99,34 @@ export interface SendEmailJobData {
   composedBody?: string;
 }
 
+export interface EnqueueSendEmailJobOptions {
+  /**
+   * BullMQ's native `delay` (ms) — the job won't become eligible to run until this much time has
+   * passed. Used by dailySchedulerService.ts to spread a day's sends across a window (see
+   * modules/scheduler/sendSpread.ts) instead of firing them all back-to-back; the manual "Send
+   * Now" dashboard action (routes/sending.ts) omits this entirely and sends immediately, as
+   * before. Once a job becomes eligible, EMAIL_SEND_RATE_LIMIT_MAX/DURATION_MS on the worker (see
+   * queue/workers/sendingWorker.ts) still governs actual processing throughput — this option
+   * only changes *when* a job joins that queue, not how fast queued-and-eligible jobs drain.
+   */
+  delayMs?: number;
+}
+
 /**
  * Enqueues one sequence-stage send for one lead. The worker (see
  * queue/workers/sendingWorker.ts) is rate-limited to respect Brevo's API limits — see
  * EMAIL_SEND_RATE_LIMIT_MAX/DURATION_MS in .env.
  */
-export async function enqueueSendEmailJob(data: SendEmailJobData): Promise<void> {
+export async function enqueueSendEmailJob(
+  data: SendEmailJobData,
+  options: EnqueueSendEmailJobOptions = {},
+): Promise<void> {
   await emailSendQueue.add('send', data, {
     attempts: 3,
     backoff: { type: 'exponential', delay: 10_000 },
     removeOnComplete: { count: 500 },
     removeOnFail: { count: 1_000 },
+    delay: options.delayMs,
   });
 }
 

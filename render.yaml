@@ -28,6 +28,24 @@
 #
 # PUBLIC_APP_URL / ALLOWED_ORIGINS — both MUST be updated after first deploy, once real URLs
 # exist (see the callouts next to each below). Do not guess these ahead of time.
+#
+# Deck generation (Backend/src/modules/deckGeneration/pdf/) renders the pitch deck PDF directly
+# via @react-pdf/renderer — pure JS, no system binaries. The pipeline used to shell out to
+# LibreOffice headless (`soffice --convert-to pdf`) to convert a pptxgenjs-built .pptx, which is
+# why earlier revisions of this file apt-get installed `libreoffice-impress` plus several font
+# packages in bebeyond-backend-worker's buildCommand — none of that runs anymore (see
+# deckGenerationService.ts, which now calls pdf/generateDeckPdf.ts instead of
+# deckBuilder.ts + pptxToPdf.ts), so there is nothing left to apt-get install for this step. The
+# old pptxgenjs/LibreOffice code paths are still present in the repo (unwired, not deleted — see
+# deckGenerationService.ts's own comment) but neither service needs any extra system package for
+# them since they're never invoked.
+#
+# Fonts: BRAND_FONT_HEADING/BRAND_FONT_BODY ("Bricolage Grotesque"/"Public Sans" — brand.ts) are
+# now embedded directly into the generated PDF from real font files shipped by the
+# @fontsource/bricolage-grotesque and @fontsource/public-sans npm packages (see
+# pdf/fonts.ts) — no OS-level font installation, no substitution risk, and no live network
+# dependency in the build (the exact concern earlier revisions of this comment raised about
+# curling fonts from a third-party repo). npm install alone is sufficient.
 
 envVarGroups:
   - name: backend-env
@@ -108,6 +126,8 @@ envVarGroups:
         sync: false
       - key: BREVO_SENDER_NAME
         sync: false
+      - key: SENDER_PERSON_NAME
+        sync: false
       - key: BREVO_INBOUND_WEBHOOK_SECRET
         sync: false
       - key: BREVO_INBOUND_WEBHOOK_URL
@@ -162,7 +182,9 @@ envVarGroups:
         sync: false
 
 services:
-  # Backend API (Express) — handles all /api/* routes the Frontend calls.
+  # Backend API (Express) — handles all /api/* routes the Frontend calls. No LibreOffice here —
+  # this service never converts a deck, only bebeyond-backend-worker below does (see the
+  # LibreOffice callout above).
   - type: web
     name: bebeyond-backend-api
     runtime: node
@@ -178,6 +200,16 @@ services:
   # Daily Scheduler + BullMQ queue workers (ingestion, categorization, deck-generation,
   # sending, scheduler) — Backend/package.json's existing "start:worker" script
   # (node dist/queue/startWorkers.js), already built for this exact purpose since Phase 4/5.
+  #
+  # plan: starter (512MB), REVERTED from a temporary standard (2GB) upgrade — that upgrade existed
+  # solely because this process used to shell out to `soffice --headless --convert-to pdf` for
+  # every deck (LibreOffice's own documented minimum footprint, on top of this same process's
+  # BullMQ/DB-pool/Redis/AI-SDK baseline, was assessed as genuinely too tight for 512MB — see git
+  # history for the original reasoning). Deck generation is now pure JS (@react-pdf/renderer, see
+  # pdf/generateDeckPdf.ts) with no native subprocess and no comparable memory spike, so the
+  # justification for the plan bump no longer applies — reverted back to starter, matching the API
+  # service. See deckGenerationWorker.ts's concurrency (also reverted, from 1 back to 2) for the
+  # other half of this reversal.
   - type: worker
     name: bebeyond-backend-worker
     runtime: node

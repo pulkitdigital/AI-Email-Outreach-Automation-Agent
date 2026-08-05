@@ -24,10 +24,12 @@ vi.mock('../../../db/repositories/emailSequencesRepository.js', () => ({
 const claimSendAttemptMock = vi.fn();
 const markSendResultMock = vi.fn();
 const findCrossLeadSendCollisionMock = vi.fn();
+const getSentSubjectForStageMock = vi.fn();
 vi.mock('../../../db/repositories/sentEmailsLogRepository.js', () => ({
   claimSendAttempt: claimSendAttemptMock,
   markSendResult: markSendResultMock,
   findCrossLeadSendCollision: findCrossLeadSendCollisionMock,
+  getSentSubjectForStage: getSentSubjectForStageMock,
 }));
 
 const composeEmailMock = vi.fn();
@@ -109,6 +111,7 @@ beforeEach(() => {
   claimSendAttemptMock.mockReset().mockResolvedValue({ id: 'log-1', isRetry: false });
   markSendResultMock.mockReset();
   findCrossLeadSendCollisionMock.mockReset().mockResolvedValue(null);
+  getSentSubjectForStageMock.mockReset().mockResolvedValue('Original subject');
   composeEmailMock.mockReset().mockResolvedValue(composed);
   providerSendEmailMock.mockReset().mockResolvedValue({
     externalMessageId: 'ext-1',

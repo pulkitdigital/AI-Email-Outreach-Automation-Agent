@@ -44,5 +44,12 @@ export function addCoverSlide(slide: Slide, ctx: DeckContext): void {
     color: BRAND_COLORS.teal,
     fontFace: BRAND_FONT_HEADING,
     align: 'center',
+    // ctx.companyName is free-text pulled from lead data (leadsRepository), not one of this
+    // deck's fixed/verbatim copy strings — an unusually long company name at fontSize 15 could
+    // exceed this 10.33in single-line box (no `wrap`, and this line is meant to stay one line).
+    // `fit: 'shrink'` auto-reduces the font size to keep it on one line instead of clipping or
+    // spilling past the box edge; pptxgenjs's older `shrinkText` boolean does the same thing but
+    // is deprecated as of v3.3.0 in favor of `fit`.
+    fit: 'shrink',
   });
 }

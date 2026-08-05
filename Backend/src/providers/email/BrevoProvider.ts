@@ -38,6 +38,14 @@ export class BrevoProvider implements EmailProvider {
     return 'brevo';
   }
 
+  /**
+   * No open/click-tracking param exists here to set — Brevo's Transactional Email API has no
+   * per-send tracking toggle at all (see the KNOWN DELIVERABILITY LIMITATION note on the
+   * EmailProvider interface, shared/src/types/email.ts). Every send through this method carries
+   * a tracking pixel and click.brevo.com-rewritten links regardless of the params below;
+   * post-processing `params.html` here to strip them would not survive Brevo's server-side
+   * re-injection, so don't add that — it's wasted effort.
+   */
   async sendEmail(params: SendEmailParams): Promise<SendEmailResult> {
     const client = this.getClient();
 
@@ -45,7 +53,10 @@ export class BrevoProvider implements EmailProvider {
       const result = await client.transactionalEmails.sendTransacEmail({
         sender: {
           email: env.BREVO_SENDER_EMAIL,
-          name: env.BREVO_SENDER_NAME || 'BeBeyond Digital Solutions',
+          // A bare company name in the "From" display reads as agency/bulk mail — one of the
+          // signals that pushes cold outreach into Gmail's Promotions tab. Leading with the
+          // sender's actual name (SENDER_PERSON_NAME) makes this look like a 1:1 email instead.
+          name: `${env.SENDER_PERSON_NAME} from ${env.BREVO_SENDER_NAME || 'BeBeyond'}`,
         },
         to: [{ email: params.to, name: params.toName }],
         subject: params.subject,

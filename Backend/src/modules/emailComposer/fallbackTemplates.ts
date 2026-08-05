@@ -10,6 +10,14 @@ export interface FallbackCopy {
  * composerService.ts) — a send must never block or get skipped just because the AI provider
  * had a bad moment. Deliberately generic but still on-brand and honest; never claims anything
  * false (e.g. never says "attached" when nothing is attached).
+ *
+ * Tone rules match the AI prompt (see providers/ai/prompts/emailCopy.ts): first person only, no
+ * "At BeBeyond, we..." agency-pitch phrasing, no generic "I came across [Company] while
+ * researching..." opener — this references the lead's own category/industry data instead. The
+ * subject here is a best-effort default for 'followup'/'final' (used only if composerService has
+ * no prior sent subject to build a real "Re: " continuation from — see its originalSubject
+ * override); it deliberately avoids the "close the loop" / "won't follow up further" / "don't
+ * want to keep filling your inbox" clichés.
  */
 export function buildFallbackCopy(
   stage: SendableStage,
@@ -19,27 +27,27 @@ export function buildFallbackCopy(
   switch (stage) {
     case 'new':
       return {
-        subject: `A quick note for ${companyName}`,
+        subject: `quick question for ${companyName}`,
         paragraphs: [
-          `I'm reaching out from BeBeyond Digital Solutions — we work as a digital partner for businesses like ${companyName}, not a typical agency. Transparent pricing, real results over hype, and support that continues after a project ships.`,
-          `Based on what I've seen of ${companyName}, ${primaryCategoryName} looked like a strong fit for where we could help most.`,
-          `Happy to share more if useful — no pressure either way.`,
+          `Reaching out because ${companyName} looks like a good fit for ${primaryCategoryName} — wanted to check whether that's something you've already got covered, or still figuring out.`,
+          `I work directly with businesses like yours rather than through a typical agency setup — transparent pricing, no hidden layers, and I stick around after the work ships.`,
+          `No pressure either way, just curious if it's relevant right now.`,
         ],
       };
     case 'followup':
       return {
-        subject: `Following up — ${companyName}`,
+        subject: `Re: quick question for ${companyName}`,
         paragraphs: [
-          `Just following up on my note from earlier this week — wanted to check if it's useful to connect, or if now just isn't the right time.`,
-          `Either way, happy to answer any questions.`,
+          `Circling back on my note from last week — no worries if it's not on your radar right now.`,
+          `If ${primaryCategoryName} is something you're thinking about for later, happy to talk through what's worked for similar businesses. If timing's off, that's completely fine too.`,
         ],
       };
     case 'final':
       return {
-        subject: `Last note — ${companyName}`,
+        subject: `Re: quick question for ${companyName}`,
         paragraphs: [
-          `I'll leave this here for now — didn't want to keep following up without a clear signal it's useful.`,
-          `If anything changes, feel free to reach out any time — happy to pick this back up whenever it suits you.`,
+          `Haven't heard back, so I'll leave it here for now — didn't want to keep showing up in your inbox.`,
+          `If things change down the line and you need a hand with ${primaryCategoryName}, my inbox is always open. Wishing you and the team well either way.`,
         ],
       };
   }

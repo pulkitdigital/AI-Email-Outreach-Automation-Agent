@@ -1,0 +1,109 @@
+/**
+ * Reference deck page 7 ("Our Services") — PERSONALIZED: the lead's primary category (from
+ * categorization) is moved to the front and visually emphasized (border/background + a
+ * "Recommended For You" badge), reusing the same orderCategoriesForLead() mapping the old
+ * pptxgenjs slide (slides/ourServicesSlide.ts) already relied on — not reinvented here.
+ */
+import { Page, Text, View } from '@react-pdf/renderer';
+import { SlideBody, SlideTitle } from '../components.js';
+import { OUR_SERVICES_SUBTITLE } from '../../staticContent.js';
+import { orderCategoriesForLead, SERVICE_CATEGORIES } from '../../serviceCatalog.js';
+import type { DeckContext } from '../../types.js';
+import { CARD_RADIUS, COLORS, FONT_BODY, FONT_HEADING, PAGE_HEIGHT, PAGE_WIDTH, SPACING } from '../theme.js';
+
+const GAP = 20;
+
+export function OurServicesSlide({ ctx }: { ctx: DeckContext }) {
+  const ordered = orderCategoriesForLead(SERVICE_CATEGORIES, ctx.primaryCategorySlug);
+  const cardWidth = (PAGE_WIDTH - 2 * 64 - (ordered.length - 1) * GAP) / ordered.length;
+
+  return (
+    <Page size={[PAGE_WIDTH, PAGE_HEIGHT]}>
+      <SlideBody>
+        <SlideTitle
+          parts={[
+            { text: 'Our ', color: COLORS.teal },
+            { text: 'Services', color: COLORS.orange },
+          ]}
+          subtitle={OUR_SERVICES_SUBTITLE}
+        />
+        <View style={{ flexDirection: 'row', gap: GAP, alignItems: 'flex-start' }}>
+          {ordered.map((category, i) => {
+            const highlighted = category.slug === ctx.primaryCategorySlug;
+            const accent = `#${category.accentColor}`;
+            return (
+              <View key={category.slug} style={{ width: cardWidth }}>
+                {highlighted ? (
+                  <Text
+                    style={{
+                      marginBottom: 6,
+                      fontFamily: FONT_HEADING,
+                      fontWeight: 700,
+                      fontSize: 9,
+                      color: COLORS.white,
+                      backgroundColor: accent,
+                      textAlign: 'center',
+                      paddingVertical: 4,
+                      borderRadius: 4,
+                    }}
+                  >
+                    RECOMMENDED FOR YOU
+                  </Text>
+                ) : (
+                  <View style={{ height: 21 }} />
+                )}
+                <View
+                  style={{
+                    padding: 18,
+                    borderRadius: CARD_RADIUS * 0.6,
+                    borderWidth: highlighted ? 2.5 : 1.25,
+                    borderColor: accent,
+                    backgroundColor: highlighted ? COLORS.cream : COLORS.white,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontFamily: FONT_HEADING,
+                      fontWeight: 700,
+                      fontSize: 13,
+                      color: accent,
+                      textAlign: 'center',
+                    }}
+                  >
+                    {i + 1}. {category.displayName}
+                  </Text>
+                  <View style={{ marginTop: SPACING.sm }}>
+                    {category.services.map((service) => (
+                      <View
+                        key={service}
+                        style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 6 }}
+                      >
+                        {/* A small colored dot bullet rather than a "✓" text glyph — Public
+                            Sans's registered Latin subset (fonts.ts) doesn't include dingbat
+                            glyphs like U+2713, which silently renders as nothing rather than an
+                            error, so a plain shape sidesteps that font-coverage gap entirely. */}
+                        <View
+                          style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: accent }}
+                        />
+                        <Text
+                          style={{
+                            fontFamily: FONT_BODY,
+                            fontWeight: 400,
+                            fontSize: 10.5,
+                            color: COLORS.textDark,
+                          }}
+                        >
+                          {service}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      </SlideBody>
+    </Page>
+  );
+}

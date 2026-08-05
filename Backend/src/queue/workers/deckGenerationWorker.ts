@@ -8,9 +8,14 @@ import { redisConnection } from '../connection.js';
 import { DECK_GENERATION_QUEUE_NAME, type DeckGenerationJobData } from '../queues.js';
 
 /**
- * concurrency: 2 — pptx generation + upload is more CPU/IO-heavy per job than categorization,
- * so a lower concurrency than categorizationWorker's 3 avoids saturating the process; still >1
- * since jobs target distinct leads with no shared-row contention.
+ * concurrency: 2 — reverted from a temporary concurrency: 1 that existed solely because every job
+ * used to shell out to `soffice --headless --convert-to pdf` (pptxToPdf.ts), and LibreOffice's
+ * per-process memory footprint made running two at once the single biggest avoidable spike in
+ * this service's peak memory usage (see render.yaml's comment on bebeyond-backend-worker's plan
+ * for the original numbers). Deck generation is now pure JS (@react-pdf/renderer — see
+ * pdf/generateDeckPdf.ts): no native subprocess, no comparable memory spike, so there's no longer
+ * a reason to serialize jobs that otherwise target distinct leads with no shared-row contention.
+ * Matches categorizationWorker's precedent of running independent per-lead jobs concurrently.
  */
 export const deckGenerationWorker = new Worker<DeckGenerationJobData>(
   DECK_GENERATION_QUEUE_NAME,

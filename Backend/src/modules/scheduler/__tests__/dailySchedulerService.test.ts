@@ -1,6 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const envMock: { DAILY_EMAIL_LIMIT: number } = { DAILY_EMAIL_LIMIT: 5 };
+const envMock: {
+  DAILY_EMAIL_LIMIT: number;
+  WARMUP_ENABLED: boolean;
+  WARMUP_START_DATE: string | undefined;
+  WARMUP_START_LIMIT: number;
+  WARMUP_GROWTH_RATE: number;
+  WARMUP_GROWTH_INTERVAL_DAYS: number;
+  SEND_SPREAD_WINDOW_HOURS: number;
+} = {
+  DAILY_EMAIL_LIMIT: 5,
+  WARMUP_ENABLED: false,
+  WARMUP_START_DATE: undefined,
+  WARMUP_START_LIMIT: 25,
+  WARMUP_GROWTH_RATE: 1.2,
+  WARMUP_GROWTH_INTERVAL_DAYS: 3,
+  SEND_SPREAD_WINDOW_HOURS: 4,
+};
 vi.mock('../../../config/env.js', () => ({ env: envMock }));
 
 const listDueFollowupsMock = vi.fn();
@@ -46,6 +62,12 @@ const { runDailyScheduler } = await import('../dailySchedulerService.js');
 
 beforeEach(() => {
   envMock.DAILY_EMAIL_LIMIT = 5;
+  envMock.WARMUP_ENABLED = false;
+  envMock.WARMUP_START_DATE = undefined;
+  envMock.WARMUP_START_LIMIT = 25;
+  envMock.WARMUP_GROWTH_RATE = 1.2;
+  envMock.WARMUP_GROWTH_INTERVAL_DAYS = 3;
+  envMock.SEND_SPREAD_WINDOW_HOURS = 4;
   listDueFollowupsMock.mockReset().mockResolvedValue([]);
   listDueFinalsMock.mockReset().mockResolvedValue([]);
   countStoppedInRangeMock.mockReset().mockResolvedValue({ reply: 0, bounce: 0, unsubscribe: 0 });
@@ -137,5 +159,38 @@ describe('runDailyScheduler', () => {
       '2026-07-31',
       expect.objectContaining({ skippedReply: 2, skippedBounce: 1, skippedOptout: 3 }),
     );
+  });
+
+  describe('warm-up ramp integration', () => {
+    it('caps NEW leads at the ramped limit (not DAILY_EMAIL_LIMIT) when warm-up is enabled and below the configured ceiling', async () => {
+      envMock.WARMUP_ENABLED = true;
+      envMock.WARMUP_START_DATE = '2026-07-31'; // same as the mocked runDate -> day 0 -> ramp = WARMUP_START_LIMIT
+      envMock.WARMUP_START_LIMIT = 2;
+      // DAILY_EMAIL_LIMIT stays 5 — the ramp (2) is the binding constraint, not the configured ceiling.
+      listLeadIdsByStatusMock.mockResolvedValue(['lead-n1', 'lead-n2', 'lead-n3', 'lead-n4']);
+
+      const result = await runDailyScheduler();
+
+      expect(result.newQueued).toBe(2);
+      expect(recordSchedulerRunMock).toHaveBeenCalledWith(
+        '2026-07-31',
+        expect.objectContaining({ dailyCap: 2 }),
+      );
+    });
+
+    it('is unaffected by warm-up config when WARMUP_ENABLED is false — still uses the flat DAILY_EMAIL_LIMIT', async () => {
+      envMock.WARMUP_ENABLED = false;
+      envMock.WARMUP_START_DATE = '2026-07-31';
+      envMock.WARMUP_START_LIMIT = 1; // would bind hard if it were read at all
+      listLeadIdsByStatusMock.mockResolvedValue(['lead-n1', 'lead-n2', 'lead-n3']);
+
+      const result = await runDailyScheduler();
+
+      expect(result.newQueued).toBe(3);
+      expect(recordSchedulerRunMock).toHaveBeenCalledWith(
+        '2026-07-31',
+        expect.objectContaining({ dailyCap: 5 }),
+      );
+    });
   });
 });

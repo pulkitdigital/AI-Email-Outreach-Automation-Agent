@@ -3,7 +3,11 @@
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
-    "types": ["node"]
+    "types": ["node"],
+    // JSX support exists solely for the pdf/ deck-generation module (@react-pdf/renderer slide
+    // components) — react-jsx emits React.createElement calls via the "react/jsx-runtime"
+    // automatic import, so .tsx files need no explicit `import React` line.
+    "jsx": "react-jsx"
   },
   "include": ["src"]
 }

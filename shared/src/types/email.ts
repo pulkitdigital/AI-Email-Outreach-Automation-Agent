@@ -63,6 +63,19 @@ export interface UnsubscribeResult {
  * backend/src/providers/email/GmailProvider.ts (stubbed — throws immediately on construction
  * until Google Workspace access is resolved, see docs/ARCHITECTURE.md § 5). Selected at runtime
  * by backend/src/providers/email/index.ts based on process.env.EMAIL_PROVIDER.
+ *
+ * KNOWN DELIVERABILITY LIMITATION (Brevo): Brevo's Transactional Email API has no per-send way
+ * to disable open/click tracking — confirmed on Brevo's own community forum. The only control is
+ * an account-level "anonymous tracking" toggle, and even that still fires the tracking pixel and
+ * still rewrites links through click.brevo.com; it only stops attributing the event to a named
+ * contact. In other words: every email BrevoProvider sends carries a third-party tracking pixel
+ * and click.brevo.com-rewritten links no matter what SendEmailParams contains — there is no
+ * `sendEmail` param that turns this off, and post-processing the outgoing HTML to strip it is a
+ * dead end (Brevo re-injects both server-side regardless of what's in the request payload).
+ * For cold outreach to a domain with no sending history, both of those are signals a spam
+ * classifier can key on. Switching EMAIL_PROVIDER=gmail (once the Google Workspace domain issue
+ * blocking GmailProvider is resolved — see that class's docstring) removes this signal entirely:
+ * a Gmail API send has no tracking pixel and no link-rewriting third party in the path at all.
  */
 export interface EmailProvider {
   getProviderName(): EmailProviderName;

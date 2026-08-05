@@ -1,5 +1,5 @@
-const BRAND_ORANGE = '#FB8500';
-const BRAND_TEAL = '#219EBC';
+import { env } from '../../config/env.js';
+
 const CONTACT = {
   companyName: 'BeBeyond Digital Solutions',
   email: 'info@bebeyond.digital',
@@ -30,44 +30,37 @@ export interface RenderEmailInput {
 
 /**
  * Wraps AI-generated (or fallback) copy in a fixed structure: greeting, body, signature block,
- * unsubscribe footer. The signature and unsubscribe link are always present here, regardless
- * of what the AI returned — this is the compliance guarantee, enforced by never letting the AI
- * touch this function's output.
+ * opt-out line. The signature and opt-out link are always present here, regardless of what the
+ * AI returned — this is the compliance guarantee, enforced by never letting the AI touch this
+ * function's output.
+ *
+ * Deliberately minimal HTML — no table layout, no background-color, no brand colors/logo
+ * styling, no styled "Unsubscribe" button. bebeyond.digital has no prior sending history and
+ * cold outreach needs to read as a genuine 1:1 email (what a person would type directly in
+ * Gmail), not a bulk-marketing template — that structural difference (table wrapper, colored
+ * CTA-style links, "You're receiving this because..." boilerplate) is exactly the kind of
+ * pattern Gmail's Promotions-tab classifier keys on. The opt-out mechanism itself (the token/URL
+ * from unsubscribeToken.ts) is unchanged — only its visual/textual presentation is: it's a plain
+ * inline link inside a natural sentence, not a labeled button.
  */
 export function renderEmailHtml(input: RenderEmailInput): string {
-  const paragraphsHtml = input.paragraphs
-    .map(
-      (p) =>
-        `<p style="margin: 0 0 16px; font-size: 15px; line-height: 1.6; color: #2B2B2B;">${escapeHtml(p)}</p>`,
-    )
-    .join('\n');
+  const paragraphsHtml = input.paragraphs.map((p) => `<p>${escapeHtml(p)}</p>`).join('\n');
 
   const whatsappHtml = input.whatsappCtaUrl
-    ? `<p style="margin: 0 0 16px; font-size: 15px; color: #2B2B2B;">Prefer WhatsApp? <a href="${escapeHtml(input.whatsappCtaUrl)}" style="color: ${BRAND_TEAL};">Message us there</a> instead.</p>`
+    ? `<p>Prefer WhatsApp? You can message us there instead: <a href="${escapeHtml(input.whatsappCtaUrl)}">${escapeHtml(input.whatsappCtaUrl)}</a></p>`
     : '';
 
   return `<!DOCTYPE html>
 <html>
-  <body style="margin: 0; padding: 0; background-color: #FFFFFF; font-family: Arial, sans-serif;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-      <tr>
-        <td style="padding: 24px;">
-          <p style="margin: 0 0 16px; font-size: 15px; color: #2B2B2B;">Hi ${escapeHtml(input.greetingName)},</p>
-          ${paragraphsHtml}
-          ${whatsappHtml}
-          <p style="margin: 24px 0 4px; font-size: 15px; color: #2B2B2B;">Best,</p>
-          <p style="margin: 0 0 24px; font-size: 15px; color: #2B2B2B;">
-            <strong style="color: ${BRAND_ORANGE};">Be</strong><strong style="color: ${BRAND_TEAL};">Beyond</strong> Digital Solutions<br />
-            ${escapeHtml(CONTACT.email)} &nbsp;|&nbsp; ${escapeHtml(CONTACT.phone)}
-          </p>
-          <hr style="border: none; border-top: 1px solid #E5E5E5; margin: 16px 0;" />
-          <p style="margin: 0; font-size: 11px; color: #8A8A8A;">
-            You're receiving this because your business was identified as a potential fit for our services.
-            <a href="${escapeHtml(input.unsubscribeUrl)}" style="color: ${BRAND_TEAL};">Unsubscribe</a> to stop receiving emails from us.
-          </p>
-        </td>
-      </tr>
-    </table>
+  <body style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #202124;">
+    <p>Hi ${escapeHtml(input.greetingName)},</p>
+    ${paragraphsHtml}
+    ${whatsappHtml}
+    <p>Best,<br />
+    ${escapeHtml(env.SENDER_PERSON_NAME)}<br />
+    ${escapeHtml(CONTACT.companyName)}<br />
+    ${escapeHtml(CONTACT.email)} | ${escapeHtml(CONTACT.phone)}</p>
+    <p>If you'd rather not hear from us, just reply and let me know — or <a href="${escapeHtml(input.unsubscribeUrl)}">opt out here</a>.</p>
   </body>
 </html>`;
 }
@@ -84,14 +77,8 @@ export function renderPlainTextAsHtml(text: string): string {
   const escaped = escapeHtml(text).replace(/\n/g, '<br />');
   return `<!DOCTYPE html>
 <html>
-  <body style="margin: 0; padding: 0; background-color: #FFFFFF; font-family: Arial, sans-serif;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-      <tr>
-        <td style="padding: 24px; font-size: 15px; line-height: 1.6; color: #2B2B2B;">
-          ${escaped}
-        </td>
-      </tr>
-    </table>
+  <body style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #202124;">
+    ${escaped}
   </body>
 </html>`;
 }
@@ -101,12 +88,13 @@ export function renderEmailText(input: RenderEmailInput): string {
     `Hi ${input.greetingName},`,
     '',
     ...input.paragraphs.flatMap((p) => [p, '']),
-    ...(input.whatsappCtaUrl ? [`Prefer WhatsApp? Message us: ${input.whatsappCtaUrl}`, ''] : []),
+    ...(input.whatsappCtaUrl ? [`Prefer WhatsApp? You can message us there: ${input.whatsappCtaUrl}`, ''] : []),
     'Best,',
-    `${CONTACT.companyName}`,
+    env.SENDER_PERSON_NAME,
+    CONTACT.companyName,
     `${CONTACT.email} | ${CONTACT.phone}`,
     '',
-    `Unsubscribe: ${input.unsubscribeUrl}`,
+    `If you'd rather not hear from us, just reply and let me know — or opt out here: ${input.unsubscribeUrl}`,
   ];
   return lines.join('\n');
 }

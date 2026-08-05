@@ -38,6 +38,13 @@ export async function composeEmail(input: ComposeEmailInput): Promise<ComposedEm
     usedAiCopy = false;
   }
 
+  // 'followup'/'final' must read as a continuation of the SAME thread the lead already got a
+  // 'new'-stage email in, not a fresh unrelated email — so their subject is never left to the AI
+  // (or the fallback template) to invent. This overrides whatever subject either source produced.
+  if (input.stage !== 'new' && input.originalSubject) {
+    subject = `Re: ${input.originalSubject}`;
+  }
+
   const greetingName = input.contactName?.trim() || 'there';
 
   const html = renderEmailHtml({

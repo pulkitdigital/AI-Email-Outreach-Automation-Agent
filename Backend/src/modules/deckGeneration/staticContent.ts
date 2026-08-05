@@ -51,26 +51,36 @@ export const OUR_STORY: StoryStep[] = [
 ];
 
 /**
- * Client names from the "Success Stories" slide (page 4). The reference deck shows actual
- * logos; without those image assets, names are rendered as a badge grid instead — see
- * Docs/ARCHITECTURE.md § 3 for this simplification.
+ * Client names from the "Success Stories" slide (page 4 of the real reference,
+ * Docs/design-reference/pitch-deck-reference.pdf), visually read off the deck's 27-logo grid in
+ * its own row-by-row reading order — without those logo image assets, names are rendered as a
+ * typographic name grid instead (pdf/slides/SuccessStoriesSlide.tsx). Logos with no legible
+ * company name (an unlabeled purple network icon, a "TB" monogram-only mark, an unlabeled orange
+ * "C" circle, and an unlabeled gradient "SC" circle) are deliberately excluded rather than
+ * guessed. This list replaces an earlier, incomplete 18-name extraction (which also misspelled
+ * "Ttapio Cafe" as "Tiapio Cafe") — verified accurate as of 2026-08-05.
  */
 export const SUCCESS_STORY_CLIENTS: string[] = [
   'Sajit by C Anupama',
   'SSCO',
+  'Sappy So Happy!',
+  'The Celeste Chic & Co',
   'JNAB',
   'Utkarsh Singhal Law Offices',
   'First Print Publications',
+  'JW',
   'ZebraLearn',
   'DataGOL',
   'Scanner Adda',
-  'Kazaru Installations',
-  'KayPee Dies',
-  'Tiapio Cafe',
+  'Kazaru Installations + Art',
+  'KayPee Dies (Since 1968)',
+  'Ttapio Cafe',
   'Indi Genius Matters',
   'The Woods Living',
   'Whimsical Tides',
-  'Venus',
+  'NAC – National Academy of Commerce',
+  'Venus (A Taste of Home)',
+  'M Uniforms',
   'SkyPro Aviation',
   'Navli Jewellers',
   'Amber',
@@ -100,15 +110,22 @@ export const TECHNOLOGY_SOLUTIONS: IconColumn[] = [
   { title: 'AI Bot', items: ['AI Chatbots', 'Automation', 'CRM Integration'] },
 ];
 
+/** Page 7 ("Our Services") subtitle, verbatim from the reference. */
+export const OUR_SERVICES_SUBTITLE = 'Technology, Marketing & Creative Solutions';
+
 export interface ServiceDeepDiveItem {
   title: string;
   body: string;
 }
 
 /**
- * Page 10 ("Creative Services" in the reference deck — the label is reused there for what's
- * actually a marketing-services deep dive; kept as-is to match the source). Used as the
- * "Creative Services detail" static section named in the Phase 3 requirements.
+ * The reference deck actually has TWO near-duplicate "Creative Services" pages (8 and 9). Page 9
+ * is the one captured here verbatim (5 cards: SEO, PPC, SMM, Email Marketing, WhatsApp
+ * Marketing) — its content is used for the merged "Creative Services detail" slide per the
+ * original task brief's instruction to combine the two. Page 8's more granular 3-column
+ * breakdown (Social Media Marketing / Performance Marketing / SEO & Analytics sub-items) is
+ * superseded by that merge and intentionally NOT built as a 13th slide — it exists in the
+ * reference PDF if it's ever wanted later, but isn't reproduced here.
  */
 export const SERVICE_DEEP_DIVE: ServiceDeepDiveItem[] = [
   { title: 'Search Engine Optimization', body: 'Improve visibility and rank higher.' },
@@ -117,6 +134,10 @@ export const SERVICE_DEEP_DIVE: ServiceDeepDiveItem[] = [
   { title: 'Email Marketing', body: 'Nurture leads and drive conversions.' },
   { title: 'WhatsApp Marketing', body: 'Connect directly with customers.' },
 ];
+
+/** Page 9 ("Creative Services", the merged card set above) subtitle, verbatim from the reference. */
+export const SERVICE_DEEP_DIVE_SUBTITLE =
+  'Smart digital marketing solutions to grow your brand, reach the right audience, and drive better results.';
 
 export interface ComparisonRow {
   label: string;

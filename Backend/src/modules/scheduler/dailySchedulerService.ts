@@ -13,6 +13,8 @@ import {
 } from '../../db/repositories/dailySummaryRepository.js';
 import { enqueueSendEmailJob } from '../../queue/queues.js';
 import { syncRepliesFromProvider } from '../replyTracking/replyTrackingService.js';
+import { computeEffectiveDailyLimit } from './warmup.js';
+import { computeSendSpreadDelayMs } from './sendSpread.js';
 
 /** Same bound-by-default pattern as listLeadIdsByStatus's own default — never an unbounded scan. */
 const NEW_LEAD_FETCH_LIMIT = 5000;
@@ -88,9 +90,16 @@ export async function runDailyScheduler(): Promise<DailySchedulerResult> {
     errors.push(`list-new-eligible: ${errorOf(err)}`);
   }
 
-  // Step 5: apply the 300/day cap. followups+finals are deadline-bound and always go through in
+  // Step 5: apply today's cap. followups+finals are deadline-bound and always go through in
   // full, even over cap — never silently dropped. NEW only fills whatever quota remains.
+  //
+  // The cap itself is DAILY_EMAIL_LIMIT, UNLESS the warm-up ramp (WARMUP_ENABLED — see
+  // modules/scheduler/warmup.ts) hasn't reached that ceiling yet, in which case it's the ramped,
+  // smaller value for today. computeEffectiveDailyLimit is a pure function of `runDate`, so this
+  // is safe to recompute on every call (including a crash-and-rerun of this whole function) —
+  // see that module's docstring.
   const { dayStart, dayEnd } = getDayBoundsInSchedulerTimezone(runDate);
+  const effectiveDailyLimit = computeEffectiveDailyLimit(runDate);
 
   let alreadyClaimedToday = 0;
   try {
@@ -100,25 +109,30 @@ export async function runDailyScheduler(): Promise<DailySchedulerResult> {
   }
 
   const priorityCount = dueFollowups.length + dueFinals.length;
-  const priorityExceededCap = alreadyClaimedToday + priorityCount > env.DAILY_EMAIL_LIMIT;
-  const remainingQuota = Math.max(0, env.DAILY_EMAIL_LIMIT - alreadyClaimedToday - priorityCount);
+  const priorityExceededCap = alreadyClaimedToday + priorityCount > effectiveDailyLimit;
+  const remainingQuota = Math.max(0, effectiveDailyLimit - alreadyClaimedToday - priorityCount);
 
   if (priorityExceededCap) {
     const message =
       `deadline-bound sends today (${priorityCount} followup+final, ${alreadyClaimedToday} ` +
-      `already claimed today) exceed DAILY_EMAIL_LIMIT (${env.DAILY_EMAIL_LIMIT}) — sending all ` +
-      `of them anyway; 0 NEW emails will be queued today`;
+      `already claimed today) exceed DAILY_EMAIL_LIMIT (today's effective limit: ` +
+      `${effectiveDailyLimit}, configured max: ${env.DAILY_EMAIL_LIMIT}) — sending all of them ` +
+      `anyway; 0 NEW emails will be queued today`;
     console.warn(`[scheduler] ${message}`);
     errors.push(message);
   }
 
   const newLeadIdsToQueue = newLeadIds.slice(0, remainingQuota);
 
-  // Step 6: queue through the Phase 4 sending engine.
+  // Step 6: queue through the Phase 4 sending engine. Each job gets its own randomized delay
+  // (computeSendSpreadDelayMs, independently per job — not one shared delay for the whole batch)
+  // so today's sends land spread across SEND_SPREAD_WINDOW_HOURS instead of firing back-to-back
+  // the instant this function runs. This only affects scheduler-enqueued sends; the manual "Send
+  // Now" dashboard action (routes/sending.ts) calls enqueueSendEmailJob with no delay, unchanged.
   let followupQueued = 0;
   for (const { leadId } of dueFollowups) {
     try {
-      await enqueueSendEmailJob({ leadId, stage: 'followup' });
+      await enqueueSendEmailJob({ leadId, stage: 'followup' }, { delayMs: computeSendSpreadDelayMs() });
       followupQueued += 1;
     } catch (err) {
       errors.push(`enqueue-followup(${leadId}): ${errorOf(err)}`);
@@ -128,7 +142,7 @@ export async function runDailyScheduler(): Promise<DailySchedulerResult> {
   let finalQueued = 0;
   for (const { leadId } of dueFinals) {
     try {
-      await enqueueSendEmailJob({ leadId, stage: 'final' });
+      await enqueueSendEmailJob({ leadId, stage: 'final' }, { delayMs: computeSendSpreadDelayMs() });
       finalQueued += 1;
     } catch (err) {
       errors.push(`enqueue-final(${leadId}): ${errorOf(err)}`);
@@ -138,7 +152,7 @@ export async function runDailyScheduler(): Promise<DailySchedulerResult> {
   let newQueued = 0;
   for (const leadId of newLeadIdsToQueue) {
     try {
-      await enqueueSendEmailJob({ leadId, stage: 'new' });
+      await enqueueSendEmailJob({ leadId, stage: 'new' }, { delayMs: computeSendSpreadDelayMs() });
       newQueued += 1;
     } catch (err) {
       errors.push(`enqueue-new(${leadId}): ${errorOf(err)}`);
@@ -162,7 +176,7 @@ export async function runDailyScheduler(): Promise<DailySchedulerResult> {
       skippedReply: stoppedCounts.reply,
       skippedBounce: stoppedCounts.bounce,
       skippedOptout: stoppedCounts.unsubscribe,
-      dailyCap: env.DAILY_EMAIL_LIMIT,
+      dailyCap: effectiveDailyLimit,
       priorityExceededCap,
       errors,
       startedAt,
