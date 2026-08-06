@@ -16,7 +16,12 @@ export interface StoryStep {
   body: string;
 }
 
-/** Reference deck page 3 ("Our Story"), simplified from its circular diagram to a numbered grid — see Docs/ARCHITECTURE.md § 3 Deck Generation Layer for why. */
+/**
+ * Reference deck page 3 ("Our Story"), simplified from its circular diagram to a numbered grid —
+ * see Docs/ARCHITECTURE.md § 3 Deck Generation Layer for why. The dedicated Our Story slide was
+ * later removed from the react-pdf deck; this array is kept only for the legacy pptxgenjs
+ * slides/ourStorySlide.ts, which still imports it.
+ */
 export const OUR_STORY: StoryStep[] = [
   {
     step: 1,
@@ -103,7 +108,54 @@ export const HOW_CAN_WE_HELP: string[] = [
   'Competitive Advantage',
 ];
 
-/** Page 6 ("Technology Solutions") — 3 columns. */
+/**
+ * Maps each service category (serviceCatalog.ts's SERVICE_CATEGORIES slugs) to the 2-3
+ * HOW_CAN_WE_HELP benefits most relevant to it — judgment-based matching of each benefit's actual
+ * meaning to each category's services, not verbatim reference content (every label still comes
+ * from HOW_CAN_WE_HELP itself, nothing invented). Used by orderBenefitsForLead() below to
+ * personalize the "How Can We Help?" slide the same way orderCategoriesForLead() personalizes
+ * "Our Services".
+ *
+ * - Digital Marketing (SMM/SEO/GMB/performance marketing) → visibility, ad-spend efficiency, growth.
+ * - Web & App Solutions (websites/apps/automation) → operational efficiency, credibility, an edge over competitors.
+ * - Creative Services (branding/design/video) → pride in the output, a more trustworthy brand image, more engagement.
+ * - Marketplace & Commerce (Amazon/Flipkart/Meesho/Myntra listings) → one less thing to worry about, a new growth channel, staying ahead of competitors already selling there.
+ */
+export const HOW_CAN_WE_HELP_BY_CATEGORY: Record<string, string[]> = {
+  'digital-marketing': ['Increased Visibility', 'Optimized Marketing Spend', 'Excitement for Growth'],
+  'web-app-solutions': ['Streamlined Processes', 'Confidence and Trust', 'Competitive Advantage'],
+  'creative-services': ['Sense of Achievement', 'Confidence and Trust', 'Increased Visibility'],
+  'marketplace-commerce': ['Peace of Mind', 'Excitement for Growth', 'Competitive Advantage'],
+};
+
+/**
+ * Moves the benefits mapped to the lead's primary category (HOW_CAN_WE_HELP_BY_CATEGORY) to the
+ * front of the grid, in that mapping's own relevance order, while preserving the relative order
+ * of everything else — mirrors serviceCatalog.ts's orderCategoriesForLead() pattern: a pure
+ * function so the personalization logic is unit-testable without touching react-pdf at all, with
+ * the same graceful degradation (an unrecognized/missing category, or a mapping that doesn't
+ * actually match any real benefit label, returns the original order unchanged rather than
+ * crashing or silently dropping items).
+ */
+export function orderBenefitsForLead(benefits: string[], primaryCategorySlug: string | null): string[] {
+  if (!primaryCategorySlug) return benefits;
+
+  const relevant = HOW_CAN_WE_HELP_BY_CATEGORY[primaryCategorySlug];
+  if (!relevant || relevant.length === 0) return benefits;
+
+  const front = relevant.filter((label) => benefits.includes(label));
+  if (front.length === 0) return benefits;
+
+  const frontSet = new Set(front);
+  const rest = benefits.filter((label) => !frontSet.has(label));
+  return [...front, ...rest];
+}
+
+/**
+ * Page 6 ("Technology Solutions") — 3 columns. The dedicated Technology Solutions slide was later
+ * removed from the react-pdf deck; this array is kept only for the legacy pptxgenjs
+ * slides/technologySolutionsSlide.ts, which still imports it.
+ */
 export const TECHNOLOGY_SOLUTIONS: IconColumn[] = [
   { title: 'Web Development', items: ['Business Sites', 'E-commerce', 'Landing Pages'] },
   { title: 'App Development', items: ['Android & iOS', 'Flutter Apps', 'UI/UX Design'] },
@@ -126,6 +178,9 @@ export interface ServiceDeepDiveItem {
  * breakdown (Social Media Marketing / Performance Marketing / SEO & Analytics sub-items) is
  * superseded by that merge and intentionally NOT built as a 13th slide — it exists in the
  * reference PDF if it's ever wanted later, but isn't reproduced here.
+ *
+ * The dedicated Creative Services slide was later removed from the react-pdf deck; this array is
+ * kept only for the legacy pptxgenjs slides/serviceDeepDiveSlide.ts, which still imports it.
  */
 export const SERVICE_DEEP_DIVE: ServiceDeepDiveItem[] = [
   { title: 'Search Engine Optimization', body: 'Improve visibility and rank higher.' },
@@ -135,17 +190,18 @@ export const SERVICE_DEEP_DIVE: ServiceDeepDiveItem[] = [
   { title: 'WhatsApp Marketing', body: 'Connect directly with customers.' },
 ];
 
-/** Page 9 ("Creative Services", the merged card set above) subtitle, verbatim from the reference. */
-export const SERVICE_DEEP_DIVE_SUBTITLE =
-  'Smart digital marketing solutions to grow your brand, reach the right audience, and drive better results.';
-
 export interface ComparisonRow {
   label: string;
   bebeyond: string;
   competitors: string;
 }
 
-/** Page 11 ("Why Choose Us?") — comparison table, verbatim. */
+/**
+ * Page 11 ("Why Choose Us?") — comparison table, verbatim. The dedicated Why Choose Us slide was
+ * later removed from the react-pdf deck, but this array is still used by AboutUsSlide.tsx (row
+ * labels reused as a short differentiator tag strip) and by the legacy pptxgenjs
+ * slides/whyChooseUsSlide.ts — kept for both.
+ */
 export const WHY_CHOOSE_US: ComparisonRow[] = [
   {
     label: 'Real Results, No Hype',
@@ -174,7 +230,11 @@ export const WHY_CHOOSE_US: ComparisonRow[] = [
   },
 ];
 
-/** Page 12 ("How We Work") — verbatim. */
+/**
+ * Page 12 ("How We Work") — verbatim. The dedicated How We Work slide was later removed from the
+ * react-pdf deck; this array is kept only for the legacy pptxgenjs slides/howWeWorkSlide.ts,
+ * which still imports it.
+ */
 export const HOW_WE_WORK: string[] = [
   'We partner with you to build long-term success.',
   'Client collaboration is highly valued.',

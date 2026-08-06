@@ -1,4 +1,15 @@
-/** Reference deck page 5 ("How can we help?") — 8 benefit cards in a 4x2 grid, numbered badges alternating orange/tealShape, each with a simple inline SVG icon. */
+/**
+ * Reference deck page 5 ("How can we help?") — 8 benefit cards in a 4x2 grid, numbered badges
+ * alternating orange/tealShape, each with a simple inline SVG icon. Cards carry a small "01"–"08"
+ * numeral in the corner — verified present in the reference deck's own card design (each benefit
+ * is numbered there too), not an invented addition.
+ *
+ * PERSONALIZED: the 2-3 benefits most relevant to the lead's primary category (see
+ * staticContent.ts's HOW_CAN_WE_HELP_BY_CATEGORY) are moved to the front via orderBenefitsForLead()
+ * and given a lighter "FOR YOU" highlight treatment — mirroring the Our Services slide's
+ * "Recommended For You" personalization, scoped down to fit an 8-card grid instead of a 4-item
+ * list (a badge above every highlighted card here would be too busy).
+ */
 import { Page, Text, View } from '@react-pdf/renderer';
 import { IconBadge, SlideBody, SlideTitle } from '../components.js';
 import {
@@ -11,17 +22,31 @@ import {
   TrendUpIcon,
   TrophyIcon,
 } from '../icons.js';
-import { HOW_CAN_WE_HELP } from '../../staticContent.js';
-import { COLORS, FONT_HEADING, PAGE_HEIGHT, PAGE_WIDTH, SPACING } from '../theme.js';
+import { HOW_CAN_WE_HELP, HOW_CAN_WE_HELP_BY_CATEGORY, orderBenefitsForLead } from '../../staticContent.js';
+import type { DeckContext } from '../../types.js';
+import { CARD_GAP, COLORS, FONT_HEADING, PAGE_HEIGHT, PAGE_MARGIN, PAGE_WIDTH, SPACING } from '../theme.js';
 
-/** Icon per benefit, matched by its position in HOW_CAN_WE_HELP (staticContent.ts) — see the slide-by-slide build spec for the reasoning behind each pairing. */
-const ICONS = [TrendUpIcon, GearIcon, CoinsIcon, HandshakeIcon, MedalIcon, ShieldCheckIcon, RocketIcon, TrophyIcon];
+/** Icon per benefit, keyed by label rather than array position — position no longer identifies a
+ * benefit once orderBenefitsForLead() can move any of the 8 to the front. */
+const ICONS: Record<string, typeof TrendUpIcon> = {
+  'Increased Visibility': TrendUpIcon,
+  'Streamlined Processes': GearIcon,
+  'Optimized Marketing Spend': CoinsIcon,
+  'Confidence and Trust': HandshakeIcon,
+  'Sense of Achievement': MedalIcon,
+  'Peace of Mind': ShieldCheckIcon,
+  'Excitement for Growth': RocketIcon,
+  'Competitive Advantage': TrophyIcon,
+};
 
 const COLUMNS = 4;
-const GAP = 16;
 
-export function HowCanWeHelpSlide() {
-  const cardWidth = (PAGE_WIDTH - 2 * 64 - (COLUMNS - 1) * GAP) / COLUMNS;
+export function HowCanWeHelpSlide({ ctx }: { ctx: DeckContext }) {
+  const cardWidth = (PAGE_WIDTH - 2 * PAGE_MARGIN - (COLUMNS - 1) * CARD_GAP.md) / COLUMNS;
+  const ordered = orderBenefitsForLead(HOW_CAN_WE_HELP, ctx.primaryCategorySlug);
+
+  const relevant = ctx.primaryCategorySlug ? (HOW_CAN_WE_HELP_BY_CATEGORY[ctx.primaryCategorySlug] ?? []) : [];
+  const highlightedLabels = new Set(relevant.filter((label) => HOW_CAN_WE_HELP.includes(label)));
 
   return (
     <Page size={[PAGE_WIDTH, PAGE_HEIGHT]}>
@@ -32,42 +57,81 @@ export function HowCanWeHelpSlide() {
             { text: 'we help?', color: COLORS.orange },
           ]}
         />
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: GAP }}>
-          {HOW_CAN_WE_HELP.map((label, i) => {
-            const accent = i % 2 === 0 ? COLORS.orange : COLORS.tealShape;
-            const Icon = ICONS[i] ?? TrendUpIcon;
-            return (
-              <View
-                key={label}
-                style={{
-                  width: cardWidth,
-                  paddingVertical: 20,
-                  paddingHorizontal: 12,
-                  borderRadius: 14,
-                  borderWidth: 1.25,
-                  borderColor: accent,
-                  backgroundColor: COLORS.white,
-                  alignItems: 'center',
-                }}
-              >
-                <IconBadge color={accent} size={44}>
-                  <Icon size={24} color={COLORS.white} />
-                </IconBadge>
-                <Text
+        <View style={{ flex: 1, justifyContent: 'center' }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: CARD_GAP.md }}>
+            {ordered.map((label, i) => {
+              const accent = i % 2 === 0 ? COLORS.orange : COLORS.tealShape;
+              const Icon = ICONS[label] ?? TrendUpIcon;
+              const highlighted = highlightedLabels.has(label);
+              return (
+                <View
+                  key={label}
                   style={{
-                    marginTop: SPACING.sm,
-                    fontFamily: FONT_HEADING,
-                    fontWeight: 700,
-                    fontSize: 11.5,
-                    textAlign: 'center',
-                    color: accent,
+                    width: cardWidth,
+                    minHeight: 208,
+                    paddingVertical: SPACING.xl,
+                    paddingHorizontal: SPACING.sm,
+                    borderRadius: 16,
+                    borderWidth: highlighted ? 2.5 : 1.25,
+                    borderColor: accent,
+                    backgroundColor: highlighted ? COLORS.cream : COLORS.white,
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}
                 >
-                  {label}
-                </Text>
-              </View>
-            );
-          })}
+                  {highlighted ? (
+                    <Text
+                      style={{
+                        position: 'absolute',
+                        top: 12,
+                        left: 14,
+                        fontFamily: FONT_HEADING,
+                        fontWeight: 700,
+                        fontSize: 8,
+                        color: COLORS.white,
+                        backgroundColor: accent,
+                        paddingVertical: 3,
+                        paddingHorizontal: 6,
+                        borderRadius: 999,
+                      }}
+                    >
+                      FOR YOU
+                    </Text>
+                  ) : null}
+                  <Text
+                    style={{
+                      position: 'absolute',
+                      top: 12,
+                      right: 16,
+                      fontFamily: FONT_HEADING,
+                      fontWeight: 700,
+                      fontSize: 14,
+                      color: accent,
+                      opacity: 0.45,
+                    }}
+                  >
+                    {String(i + 1).padStart(2, '0')}
+                  </Text>
+                  <IconBadge color={accent} size={56}>
+                    <Icon size={30} color={COLORS.white} />
+                  </IconBadge>
+                  <View style={{ marginTop: SPACING.md, width: 32, height: 2, backgroundColor: accent, borderRadius: 1 }} />
+                  <Text
+                    style={{
+                      marginTop: SPACING.md,
+                      fontFamily: FONT_HEADING,
+                      fontWeight: 700,
+                      fontSize: 13,
+                      textAlign: 'center',
+                      color: accent,
+                    }}
+                  >
+                    {label}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
         </View>
       </SlideBody>
     </Page>

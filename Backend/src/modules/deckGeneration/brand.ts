@@ -73,6 +73,8 @@ export const BRAND_CONTACT = {
   email: 'info@bebeyond.digital',
   phone: '+91 99 1867 1867',
   address: 'Chamber 6, 4th Floor, Sangam Place, Prayagraj, U.P, India - 211003',
+  website: 'https://www.bebeyond.digital/',
+  websiteLabel: 'www.bebeyond.digital',
 } as const;
 
 /** 13.33x7.5in — pptxgenjs's native 16:9 "LAYOUT_WIDE", matching the reference deck's widescreen slides. */

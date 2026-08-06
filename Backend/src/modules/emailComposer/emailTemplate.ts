@@ -4,6 +4,8 @@ const CONTACT = {
   companyName: 'BeBeyond Digital Solutions',
   email: 'info@bebeyond.digital',
   phone: '+91 99 1867 1867',
+  website: 'https://www.bebeyond.digital/',
+  websiteLabel: 'www.bebeyond.digital',
 };
 
 /**
@@ -59,7 +61,8 @@ export function renderEmailHtml(input: RenderEmailInput): string {
     <p>Best,<br />
     ${escapeHtml(env.SENDER_PERSON_NAME)}<br />
     ${escapeHtml(CONTACT.companyName)}<br />
-    ${escapeHtml(CONTACT.email)} | ${escapeHtml(CONTACT.phone)}</p>
+    ${escapeHtml(CONTACT.email)} | ${escapeHtml(CONTACT.phone)}<br />
+    <a href="${CONTACT.website}">${CONTACT.websiteLabel}</a></p>
     <p>If you'd rather not hear from us, just reply and let me know — or <a href="${escapeHtml(input.unsubscribeUrl)}">opt out here</a>.</p>
   </body>
 </html>`;
@@ -93,6 +96,7 @@ export function renderEmailText(input: RenderEmailInput): string {
     env.SENDER_PERSON_NAME,
     CONTACT.companyName,
     `${CONTACT.email} | ${CONTACT.phone}`,
+    CONTACT.website,
     '',
     `If you'd rather not hear from us, just reply and let me know — or opt out here: ${input.unsubscribeUrl}`,
   ];

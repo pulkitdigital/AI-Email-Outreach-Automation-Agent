@@ -94,7 +94,19 @@
       "Bash(where pdftoppm *)",
       "Bash(python render_pages.py)",
       "Bash(python -c ' *)",
-      "Bash(python render_rest.py)"
+      "Bash(python render_rest.py)",
+      "Bash(node -e \"console.log\\(require\\('./node_modules/@react-pdf/renderer/package.json'\\).version\\)\")",
+      "Bash(python -c \"import fitz; print\\('pymupdf ok', fitz.__doc__\\)\")",
+      "Bash(DECK_PALETTE_OVERRIDE=charcoal-plum npx tsx scripts/previewDeck.ts)",
+      "Bash(mkdir -p tmp/sample-decks)",
+      "Bash(DECK_PALETTE_OVERRIDE=charcoal-slate npx tsx scripts/previewDeck.ts)",
+      "Bash(DECK_PALETTE_OVERRIDE=charcoal-terracotta npx tsx scripts/previewDeck.ts)",
+      "Bash(rm -f \"D:/Aditya BBDS/AI-Email-Outreach-Automation-Agent-main/Backend/tmp/sample-decks/\"*.pdf)",
+      "Bash(rm -f \"D:/Aditya BBDS/AI-Email-Outreach-Automation-Agent-main/Backend/tmp/preview-deck-radiance-skin-studio.pdf\")",
+      "Bash(rm -f \"D:/Aditya BBDS/AI-Email-Outreach-Automation-Agent-main/Backend/tmp/sample-decks/\"page_*.png *)",
+      "Bash(rm -f zoom_*.png)",
+      "Bash(mv radiance-skin-studio-sample.pdf radiance-skin-studio-sample-v3.pdf)",
+      "Bash(rm -f tmp/sample-decks/radiance-skin-studio-sample.pdf)"
     ]
   }
 }

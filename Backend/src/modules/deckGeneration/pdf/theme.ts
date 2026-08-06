@@ -33,6 +33,7 @@ export const PAGE_HEIGHT = 810;
 
 /** Consistent spacing scale (points) used across every slide instead of ad-hoc magic numbers. */
 export const SPACING = {
+  xxs: 4,
   xs: 6,
   sm: 12,
   md: 20,
@@ -43,6 +44,13 @@ export const SPACING = {
 
 /** Outer page margin every slide's content respects, matching the reference deck's generous edge padding. */
 export const PAGE_MARGIN = 64;
+
+/** Row/grid gap sizes for multi-card layouts (HowCanWeHelp, OurServices, MajorWins, ...) — named tokens instead of a fresh `const GAP = ...` per slide file. */
+export const CARD_GAP = {
+  sm: 16,
+  md: 20,
+  lg: 24,
+} as const;
 
 /** Shared corner radius for cards (the reference's "About Us" card measured ~24pt). */
 export const CARD_RADIUS = 24;

@@ -223,6 +223,44 @@ export function WhatsAppIcon({ size = DEFAULT_SIZE, color = '#000000' }: IconPro
   );
 }
 
+/** Decorative opening quotation mark — used on the About Us and Major Wins cards to give a testimonial/statement slide more visual weight without adding new copy. */
+export function QuoteIcon({ size = DEFAULT_SIZE, color = '#000000' }: IconProps) {
+  return (
+    <Svg viewBox="0 0 24 24" width={size} height={size}>
+      <Path
+        d="M3 11 C3 7 5.5 4.5 9 4 L9 6.5 C7 7 5.8 8.5 5.8 11 L9 11 L9 17 L3 17 Z"
+        fill={color}
+        stroke="none"
+      />
+      <Path
+        d="M13 11 C13 7 15.5 4.5 19 4 L19 6.5 C17 7 15.8 8.5 15.8 11 L19 11 L19 17 L13 17 Z"
+        fill={color}
+        stroke="none"
+      />
+    </Svg>
+  );
+}
+
+/** A ringed checkmark — used per-row on the Why Choose Us comparison table's BeBeyond column. */
+export function CheckIcon({ size = DEFAULT_SIZE, color = '#000000' }: IconProps) {
+  return (
+    <Svg viewBox="0 0 24 24" width={size} height={size}>
+      <Circle cx={12} cy={12} r={10} {...strokeProps(color)} />
+      <Path d="M7.5 12.5 L10.5 15.5 L16.5 8.5" {...strokeProps(color)} />
+    </Svg>
+  );
+}
+
+/** A ringed cross — used per-row on the Why Choose Us comparison table's Typical Competitors column. */
+export function CrossIcon({ size = DEFAULT_SIZE, color = '#000000' }: IconProps) {
+  return (
+    <Svg viewBox="0 0 24 24" width={size} height={size}>
+      <Circle cx={12} cy={12} r={10} {...strokeProps(color)} />
+      <Path d="M8.5 8.5 L15.5 15.5 M15.5 8.5 L8.5 15.5" {...strokeProps(color)} />
+    </Svg>
+  );
+}
+
 /** A single 5-point star, used for testimonial ratings. */
 export function StarIcon({ size = 16, color = '#FB8500' }: IconProps) {
   return (

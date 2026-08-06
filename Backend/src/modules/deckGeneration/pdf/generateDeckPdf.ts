@@ -17,7 +17,7 @@ export interface BuiltDeckPdf {
 }
 
 /**
- * Renders the full 12-slide deck for one lead directly to a PDF buffer. `pageCount` is the fixed
+ * Renders the full 6-slide deck for one lead directly to a PDF buffer. `pageCount` is the fixed
  * DECK_SLIDE_COUNT rather than something read back off the rendered PDF — every call renders the
  * same fixed <Document>/<Page> structure (only text content varies per lead), so there's no
  * scenario where the actual page count could differ from what DeckDocument.tsx declares; asserting

@@ -45,6 +45,11 @@ describe('renderEmailHtml', () => {
     expect(html).not.toContain('#219EBC'); // brand teal
   });
 
+  it('includes a clickable, unescaped link to the company website in the signature block', () => {
+    const html = renderEmailHtml(baseInput);
+    expect(html).toContain('<a href="https://www.bebeyond.digital/">www.bebeyond.digital</a>');
+  });
+
   it('includes every paragraph', () => {
     const html = renderEmailHtml(baseInput);
     expect(html).toContain('First paragraph.');
@@ -86,5 +91,6 @@ describe('renderEmailText', () => {
     expect(text).toContain('rather not hear from us');
     expect(text).toContain('https://example.com/unsubscribe/lead-1/token');
     expect(text).not.toContain('Unsubscribe:');
+    expect(text).toContain('https://www.bebeyond.digital/');
   });
 });
