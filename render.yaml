@@ -191,7 +191,7 @@ services:
     plan: starter
     region: singapore
     rootDir: .
-    buildCommand: npm install && npm run build:shared && npm run build --workspace=Backend
+    buildCommand: npm install --include=dev && npm run build:shared && npm run build --workspace=Backend
     startCommand: npm run start --workspace=Backend
     healthCheckPath: /health
     envVars:
