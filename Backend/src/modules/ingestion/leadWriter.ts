@@ -1,6 +1,10 @@
 import type { ParsedLeadRow } from '@bebeyond/shared';
-import { incrementIngestionJobCounters } from '../../db/repositories/ingestionJobsRepository.js';
+import {
+  appendIngestionJobAlreadyContactedItem,
+  incrementIngestionJobCounters,
+} from '../../db/repositories/ingestionJobsRepository.js';
 import { upsertLead } from '../../db/repositories/leadsRepository.js';
+import { getContactedSummaryForLead } from '../../db/repositories/sentEmailsLogRepository.js';
 import { enqueueCategorizationJob } from '../../queue/queues.js';
 import { normalizeEmail } from './normalize.js';
 
@@ -24,7 +28,7 @@ export async function writeLeadRow(
   const emailNormalized = normalizeEmail(row.email);
   const status = row.reviewReason ? 'needs_review' : 'new';
 
-  const { record, wasCreated, mergedFields } = await upsertLead({
+  const { record, wasCreated, mergedFields, alreadyContacted } = await upsertLead({
     email: row.email.trim(),
     emailNormalized,
     companyName: row.companyName,
@@ -45,8 +49,21 @@ export async function writeLeadRow(
   await incrementIngestionJobCounters(jobId, {
     totalLeadsCreated: wasCreated ? 1 : 0,
     totalLeadsMerged: !wasCreated && mergedFields.length > 0 ? 1 : 0,
+    totalLeadsAlreadyContacted: alreadyContacted ? 1 : 0,
     totalRowsFlaggedForReview: wasCreated && status === 'needs_review' ? 1 : 0,
   });
+
+  // A sub-classification of the "already exists" case above, not a separate bucket — this row
+  // can be both "unchanged"/"merged" AND "already contacted" at the same time.
+  if (alreadyContacted) {
+    const summary = await getContactedSummaryForLead(record.id);
+    await appendIngestionJobAlreadyContactedItem(jobId, {
+      email: record.email,
+      companyName: record.companyName,
+      lastSentAt: summary.lastSentAt ? summary.lastSentAt.toISOString() : null,
+      sentCount: summary.sentCount,
+    });
+  }
 
   if (wasCreated && status === 'new') {
     await enqueueCategorizationJob({ leadId: record.id });

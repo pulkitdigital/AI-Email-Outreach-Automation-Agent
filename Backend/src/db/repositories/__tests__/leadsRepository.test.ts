@@ -64,6 +64,7 @@ describe('upsertLead', () => {
 
     expect(result.wasCreated).toBe(true);
     expect(result.mergedFields).toEqual([]);
+    expect(result.alreadyContacted).toBe(false);
     expect(releaseMock).toHaveBeenCalledTimes(1);
   });
 
@@ -75,6 +76,7 @@ describe('upsertLead', () => {
       .mockResolvedValueOnce(undefined) // BEGIN
       .mockResolvedValueOnce({ rows: [] }) // INSERT ON CONFLICT DO NOTHING -> conflict, no row
       .mockResolvedValueOnce({ rows: [existing] }) // SELECT ... FOR UPDATE
+      .mockResolvedValueOnce({ rows: [{ exists: false }] }) // already-contacted EXISTS check
       .mockResolvedValueOnce({ rows: [merged] }) // UPDATE ... RETURNING
       .mockResolvedValueOnce(undefined); // COMMIT
 
@@ -92,6 +94,7 @@ describe('upsertLead', () => {
     expect(result.wasCreated).toBe(false);
     expect(result.mergedFields).toEqual(['companyName']);
     expect(result.record.companyName).toBe('Acme Co');
+    expect(result.alreadyContacted).toBe(false);
 
     // Verify the UPDATE's SET clause only targeted company_name, not phone (RETURNING lists
     // every column including phone, so check the SET clause specifically, not the whole SQL).
@@ -118,6 +121,7 @@ describe('upsertLead', () => {
       .mockResolvedValueOnce(undefined) // BEGIN
       .mockResolvedValueOnce({ rows: [] }) // conflict
       .mockResolvedValueOnce({ rows: [existing] }) // SELECT ... FOR UPDATE
+      .mockResolvedValueOnce({ rows: [{ exists: true }] }) // already-contacted EXISTS check
       .mockResolvedValueOnce(undefined); // COMMIT (no UPDATE issued)
 
     const result = await upsertLead({
@@ -133,12 +137,21 @@ describe('upsertLead', () => {
     expect(result.wasCreated).toBe(false);
     expect(result.mergedFields).toEqual([]);
     expect(result.record).toEqual(existing);
-    expect(queryMock).toHaveBeenCalledTimes(4);
+    expect(result.alreadyContacted).toBe(true);
+    expect(queryMock).toHaveBeenCalledTimes(5);
     expect(
       queryMock.mock.calls.some(
         ([sql]) => typeof sql === 'string' && sql.startsWith('UPDATE leads'),
       ),
     ).toBe(false);
+
+    // Cheap EXISTS check, not a join — and scoped to this existing lead's id.
+    const existsCall = queryMock.mock.calls.find(
+      ([sql]) => typeof sql === 'string' && sql.includes('EXISTS'),
+    );
+    expect(existsCall?.[0]).toContain('sent_emails_log');
+    expect(existsCall?.[0]).not.toMatch(/\bJOIN\b/i);
+    expect(existsCall?.[1]).toEqual([existing.id]);
   });
 
   it('rolls back and releases the client if a query fails mid-transaction', async () => {

@@ -1,4 +1,5 @@
 import type {
+  AlreadyContactedItem,
   IngestionFileError,
   IngestionReviewItem,
   IngestionSourceType,
@@ -18,10 +19,12 @@ export interface IngestionJobRecord {
   totalRowsFound: number;
   totalLeadsCreated: number;
   totalLeadsMerged: number;
+  totalLeadsAlreadyContacted: number;
   totalRowsFlaggedForReview: number;
   totalErrors: number;
   errorDetails: IngestionFileError[];
   reviewItems: IngestionReviewItem[];
+  alreadyContactedItems: AlreadyContactedItem[];
   startedAt: Date | null;
   completedAt: Date | null;
   createdAt: Date;
@@ -34,8 +37,10 @@ const JOB_COLUMNS = `
   total_files_discovered AS "totalFilesDiscovered", files_processed AS "filesProcessed",
   total_rows_found AS "totalRowsFound", total_leads_created AS "totalLeadsCreated",
   total_leads_merged AS "totalLeadsMerged",
+  total_leads_already_contacted AS "totalLeadsAlreadyContacted",
   total_rows_flagged_for_review AS "totalRowsFlaggedForReview", total_errors AS "totalErrors",
   error_details AS "errorDetails", review_items AS "reviewItems",
+  already_contacted_items AS "alreadyContactedItems",
   started_at AS "startedAt", completed_at AS "completedAt",
   created_at AS "createdAt", updated_at AS "updatedAt"
 `;
@@ -116,8 +121,10 @@ export async function resetIngestionJobCounters(id: string): Promise<void> {
   await pool.query(
     `UPDATE ingestion_jobs SET
        total_files_discovered = 0, files_processed = 0, total_rows_found = 0,
-       total_leads_created = 0, total_leads_merged = 0, total_rows_flagged_for_review = 0,
+       total_leads_created = 0, total_leads_merged = 0, total_leads_already_contacted = 0,
+       total_rows_flagged_for_review = 0,
        total_errors = 0, error_details = '[]'::jsonb, review_items = '[]'::jsonb,
+       already_contacted_items = '[]'::jsonb,
        status = 'pending', started_at = NULL, completed_at = NULL
      WHERE id = $1`,
     [id],
@@ -130,6 +137,7 @@ export interface IngestionJobCounterDeltas {
   totalRowsFound?: number;
   totalLeadsCreated?: number;
   totalLeadsMerged?: number;
+  totalLeadsAlreadyContacted?: number;
   totalRowsFlaggedForReview?: number;
   totalErrors?: number;
 }
@@ -140,6 +148,7 @@ const COUNTER_COLUMN_BY_KEY: Record<keyof IngestionJobCounterDeltas, string> = {
   totalRowsFound: 'total_rows_found',
   totalLeadsCreated: 'total_leads_created',
   totalLeadsMerged: 'total_leads_merged',
+  totalLeadsAlreadyContacted: 'total_leads_already_contacted',
   totalRowsFlaggedForReview: 'total_rows_flagged_for_review',
   totalErrors: 'total_errors',
 };
@@ -182,6 +191,17 @@ export async function appendIngestionJobReviewItem(
 ): Promise<void> {
   await pool.query(
     `UPDATE ingestion_jobs SET review_items = review_items || $2::jsonb WHERE id = $1`,
+    [id, JSON.stringify([item])],
+  );
+}
+
+/** Appends one entry to ingestion_jobs.already_contacted_items (a matched duplicate row whose lead has already been sent at least one email — see leadsRepository.upsertLead's alreadyContacted flag). */
+export async function appendIngestionJobAlreadyContactedItem(
+  id: string,
+  item: AlreadyContactedItem,
+): Promise<void> {
+  await pool.query(
+    `UPDATE ingestion_jobs SET already_contacted_items = already_contacted_items || $2::jsonb WHERE id = $1`,
     [id, JSON.stringify([item])],
   );
 }

@@ -106,7 +106,26 @@
       "Bash(rm -f \"D:/Aditya BBDS/AI-Email-Outreach-Automation-Agent-main/Backend/tmp/sample-decks/\"page_*.png *)",
       "Bash(rm -f zoom_*.png)",
       "Bash(mv radiance-skin-studio-sample.pdf radiance-skin-studio-sample-v3.pdf)",
-      "Bash(rm -f tmp/sample-decks/radiance-skin-studio-sample.pdf)"
+      "Bash(rm -f tmp/sample-decks/radiance-skin-studio-sample.pdf)",
+      "Bash(cp /tmp/checkjobs.mjs ./checkjobs.mjs)",
+      "Bash(node checkjobs.mjs)",
+      "Bash(rm -f ./checkjobs.mjs)",
+      "Bash(nohup npx tsx watch src/index.ts)",
+      "Bash(echo \"API PID: $!\")",
+      "Bash(nohup npx tsx watch src/queue/startWorkers.ts)",
+      "Bash(echo \"WORKER PID: $!\")",
+      "Read(//tmp/**)",
+      "Bash(curl -s http://localhost:4000/api/health)",
+      "Bash(curl -s http://localhost:4000/)",
+      "Bash(tail -60 /tmp/worker.log)",
+      "PowerShell(Get-CimInstance Win32_Process -Filter \"ProcessId=28364\")",
+      "PowerShell(Get-Process -Id 28364 | Select-Object Id,StartTime,@{N='UptimeMin';E={\\(\\(Get-Date\\)-$_.StartTime\\).TotalMinutes}})",
+      "PowerShell(Get-CimInstance Win32_Process -Filter \"ParentProcessId=17848 OR ProcessId=17848\")",
+      "Bash(taskkill //F //T //PID 17848)",
+      "Bash(rm -f /tmp/api.log)",
+      "Bash(git stash *)",
+      "Bash(curl -s http://localhost:4000/api/ingestion/jobs/19097ab2-4861-43ab-88dd-f528811b973b)",
+      "Bash(python3 -m json.tool)"
     ]
   }
 }

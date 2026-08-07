@@ -70,6 +70,8 @@ export interface UpsertLeadResult {
   record: LeadRecord;
   wasCreated: boolean;
   mergedFields: string[];
+  /** True when this row matched an existing lead that has already been sent at least one email (status = 'sent'). Always false for a brand-new lead. */
+  alreadyContacted: boolean;
 }
 
 /**
@@ -114,7 +116,12 @@ export async function upsertLead(input: UpsertLeadInput): Promise<UpsertLeadResu
 
     if (insertResult.rows[0]) {
       await client.query('COMMIT');
-      return { record: insertResult.rows[0] as LeadRecord, wasCreated: true, mergedFields: [] };
+      return {
+        record: insertResult.rows[0] as LeadRecord,
+        wasCreated: true,
+        mergedFields: [],
+        alreadyContacted: false,
+      };
     }
 
     const existingResult = await client.query(
@@ -153,8 +160,22 @@ export async function upsertLead(input: UpsertLeadInput): Promise<UpsertLeadResu
         ],
       );
       await client.query('COMMIT');
-      return { record: retryInsert.rows[0] as LeadRecord, wasCreated: true, mergedFields: [] };
+      return {
+        record: retryInsert.rows[0] as LeadRecord,
+        wasCreated: true,
+        mergedFields: [],
+        alreadyContacted: false,
+      };
     }
+
+    // Cheap existence check, not a join — sub-classifies this matched duplicate as "already
+    // contacted" (see ingestion_jobs.total_leads_already_contacted) for both the merged and
+    // unchanged-duplicate cases below.
+    const contactedResult = await client.query<{ exists: boolean }>(
+      `SELECT EXISTS(SELECT 1 FROM sent_emails_log WHERE lead_id = $1 AND status = 'sent') AS exists`,
+      [existing.id],
+    );
+    const alreadyContacted = contactedResult.rows[0]?.exists ?? false;
 
     const patch = computeMergePatch(existing, {
       companyName: input.companyName,
@@ -169,7 +190,7 @@ export async function upsertLead(input: UpsertLeadInput): Promise<UpsertLeadResu
 
     if (mergedFields.length === 0) {
       await client.query('COMMIT');
-      return { record: existing, wasCreated: false, mergedFields: [] };
+      return { record: existing, wasCreated: false, mergedFields: [], alreadyContacted };
     }
 
     const columnByField: Record<string, string> = {
@@ -190,7 +211,7 @@ export async function upsertLead(input: UpsertLeadInput): Promise<UpsertLeadResu
     );
 
     await client.query('COMMIT');
-    return { record: updated.rows[0] as LeadRecord, wasCreated: false, mergedFields };
+    return { record: updated.rows[0] as LeadRecord, wasCreated: false, mergedFields, alreadyContacted };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;

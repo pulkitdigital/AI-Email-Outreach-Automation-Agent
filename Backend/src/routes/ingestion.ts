@@ -3,6 +3,7 @@ import multer from 'multer';
 import type { IngestionJobProgress, IngestionSourceType } from '@bebeyond/shared';
 import { env } from '../config/env.js';
 import {
+  completeIngestionJob,
   createIngestionJob,
   getIngestionJobById,
   listRecentIngestionJobs,
@@ -42,10 +43,12 @@ function toProgress(job: IngestionJobRecord): IngestionJobProgress {
     totalRowsFound: job.totalRowsFound,
     totalLeadsCreated: job.totalLeadsCreated,
     totalLeadsMerged: job.totalLeadsMerged,
+    totalLeadsAlreadyContacted: job.totalLeadsAlreadyContacted,
     totalRowsFlaggedForReview: job.totalRowsFlaggedForReview,
     totalErrors: job.totalErrors,
     errorDetails: job.errorDetails,
     reviewItems: job.reviewItems,
+    alreadyContactedItems: job.alreadyContactedItems,
     startedAt: job.startedAt ? job.startedAt.toISOString() : null,
     completedAt: job.completedAt ? job.completedAt.toISOString() : null,
   };
@@ -78,8 +81,9 @@ ingestionRouter.post('/upload', (req, res) => {
       return;
     }
 
+    let job: IngestionJobRecord | undefined;
     try {
-      const job = await createIngestionJob({
+      job = await createIngestionJob({
         sourceType,
         sourceReference: req.file.originalname,
       });
@@ -101,6 +105,16 @@ ingestionRouter.post('/upload', (req, res) => {
         `[ingestion-route] failed to stage upload "${req.file.originalname}":`,
         uploadErr,
       );
+      // The job row (if created) has no staged file and nothing was enqueued for it — leaving it
+      // at its default 'pending' status would strand it forever with no worker ever picking it up.
+      if (job) {
+        await completeIngestionJob(job.id, 'failed').catch((cleanupErr) => {
+          console.error(
+            `[ingestion-route] failed to mark orphaned job ${job!.id} as failed:`,
+            cleanupErr,
+          );
+        });
+      }
       res.status(500).json({ error: 'Failed to accept upload — see server logs for details' });
     }
   });

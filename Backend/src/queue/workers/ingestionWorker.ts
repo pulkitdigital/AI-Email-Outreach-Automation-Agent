@@ -15,9 +15,25 @@ import {
   type IngestionUploadJobData,
 } from '../queues.js';
 
-async function processUploadJob(data: IngestionUploadJobData): Promise<void> {
+/** Thrown when a staged upload's storage object can't be read back — distinct from a bare ENOENT/NoSuchKey so this failure mode (as opposed to e.g. a parse error) is unambiguous in logs. */
+export class IngestionFileMissingError extends Error {
+  constructor(jobId: string, storageKey: string, cause: unknown) {
+    super(
+      `IngestionFileMissingError: staged file was never written (or is no longer present) for job ${jobId} at key "${storageKey}"`,
+    );
+    this.name = 'IngestionFileMissingError';
+    this.cause = cause;
+  }
+}
+
+export async function processUploadJob(data: IngestionUploadJobData): Promise<void> {
   const storage = getStorageProvider();
-  const buffer = await storage.getObject(data.storageKey);
+  let buffer: Buffer;
+  try {
+    buffer = await storage.getObject(data.storageKey);
+  } catch (err) {
+    throw new IngestionFileMissingError(data.jobId, data.storageKey, err);
+  }
 
   const { files, warnings } = expandToLeafFiles(data.originalFileName, buffer);
   for (const warning of warnings) console.warn(`[ingestion] job=${data.jobId} ${warning}`);

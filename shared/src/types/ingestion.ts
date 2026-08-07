@@ -37,6 +37,19 @@ export interface IngestionFileError {
   message: string;
 }
 
+/**
+ * One matched-duplicate row whose existing lead has already been sent at least one email — a
+ * sub-classification of "already exists" (total_leads_merged / the unchanged-duplicate case),
+ * not a separate bucket. Lets the dashboard show exactly which rows in a re-uploaded sheet are
+ * leads already contacted, by name, not just a count. See leadsRepository.upsertLead.
+ */
+export interface AlreadyContactedItem {
+  email: string;
+  companyName: string | null;
+  lastSentAt: string | null;
+  sentCount: number;
+}
+
 /** Snapshot of ingestion_jobs progress counters, as surfaced by GET /api/ingestion/jobs/:id. */
 export interface IngestionJobProgress {
   id: string;
@@ -48,10 +61,12 @@ export interface IngestionJobProgress {
   totalRowsFound: number;
   totalLeadsCreated: number;
   totalLeadsMerged: number;
+  totalLeadsAlreadyContacted: number;
   totalRowsFlaggedForReview: number;
   totalErrors: number;
   errorDetails: IngestionFileError[];
   reviewItems: IngestionReviewItem[];
+  alreadyContactedItems: AlreadyContactedItem[];
   startedAt: string | null;
   completedAt: string | null;
 }

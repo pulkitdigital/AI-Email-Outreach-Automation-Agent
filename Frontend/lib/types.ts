@@ -1,4 +1,5 @@
 import type {
+  AlreadyContactedItem,
   CategorizationMethod,
   EmailProviderName,
   IngestionJobProgress,
@@ -16,7 +17,7 @@ import type {
   WhatsAppTemplateApprovalStatus,
 } from '@bebeyond/shared';
 
-export type { IngestionJobProgress };
+export type { IngestionJobProgress, AlreadyContactedItem };
 
 export interface Category {
   id: string;

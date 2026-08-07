@@ -21,9 +21,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { StatusBadge } from '@/components/status-badge';
 import { formatDateTime, titleCase } from '@/lib/format';
-import type { LeadListItem } from '@/lib/types';
+import type { AlreadyContactedItem, IngestionJobProgress, LeadListItem } from '@/lib/types';
 
 function UploadCard() {
   const [file, setFile] = useState<File | null>(null);
@@ -111,6 +119,48 @@ function DriveLinkCard() {
   );
 }
 
+function AlreadyContactedCell({ job }: { job: IngestionJobProgress }) {
+  const count = job.totalLeadsAlreadyContacted;
+
+  if (count === 0) {
+    return <span className="text-sm text-muted-foreground">—</span>;
+  }
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="link" size="sm" className="h-auto p-0">
+          {count} already contacted
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Already contacted</DialogTitle>
+          <DialogDescription>
+            These rows in <span className="font-medium">{job.sourceReference}</span> matched
+            existing leads that have already been sent at least one email.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="max-h-80 space-y-2 overflow-y-auto">
+          {job.alreadyContactedItems.map((item: AlreadyContactedItem, i: number) => (
+            <div
+              key={`${item.email}-${i}`}
+              className="rounded-lg border p-3 text-sm"
+            >
+              <p className="font-medium">{item.companyName ?? item.email}</p>
+              <p className="text-muted-foreground">{item.email}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Last sent {formatDateTime(item.lastSentAt)} · {item.sentCount}{' '}
+                {item.sentCount === 1 ? 'email' : 'emails'} sent
+              </p>
+            </div>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function JobsTable() {
   const { data: jobs, isLoading, isError, error } = useIngestionJobs(50);
 
@@ -140,6 +190,7 @@ function JobsTable() {
                 <TableHead className="text-right">Rows</TableHead>
                 <TableHead className="text-right">Created</TableHead>
                 <TableHead className="text-right">Merged</TableHead>
+                <TableHead className="text-right">Already Contacted</TableHead>
                 <TableHead className="text-right">Review</TableHead>
                 <TableHead className="text-right">Errors</TableHead>
                 <TableHead>Started</TableHead>
@@ -161,6 +212,9 @@ function JobsTable() {
                   <TableCell className="text-right">{job.totalRowsFound}</TableCell>
                   <TableCell className="text-right">{job.totalLeadsCreated}</TableCell>
                   <TableCell className="text-right">{job.totalLeadsMerged}</TableCell>
+                  <TableCell className="text-right">
+                    <AlreadyContactedCell job={job} />
+                  </TableCell>
                   <TableCell className="text-right">{job.totalRowsFlaggedForReview}</TableCell>
                   <TableCell className="text-right">{job.totalErrors}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">

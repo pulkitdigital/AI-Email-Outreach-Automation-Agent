@@ -304,6 +304,29 @@ export async function countSentToday(dayStart: Date, dayEnd: Date): Promise<numb
   return Number(rows[0]?.count ?? '0');
 }
 
+export interface ContactedSummary {
+  sentCount: number;
+  lastSentAt: Date | null;
+}
+
+/**
+ * Aggregate of a lead's successful ('sent') sends — used by ingestion's already-contacted
+ * visibility (see modules/ingestion/leadWriter.ts) once leadsRepository.upsertLead's cheap EXISTS
+ * check has already established the lead has at least one, to fetch the detail (count, most
+ * recent send) needed for ingestion_jobs.already_contacted_items.
+ */
+export async function getContactedSummaryForLead(leadId: string): Promise<ContactedSummary> {
+  const { rows } = await pool.query<{ sentCount: string; lastSentAt: Date | null }>(
+    `SELECT COUNT(*)::text AS "sentCount", MAX(sent_at) AS "lastSentAt"
+     FROM sent_emails_log WHERE lead_id = $1 AND status = 'sent'`,
+    [leadId],
+  );
+  return {
+    sentCount: Number(rows[0]?.sentCount ?? '0'),
+    lastSentAt: rows[0]?.lastSentAt ?? null,
+  };
+}
+
 export async function findCrossLeadSendCollision(
   leadId: string,
   emailNormalized: string,
