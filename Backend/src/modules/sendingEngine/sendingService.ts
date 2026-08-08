@@ -304,6 +304,8 @@ export async function sendSequenceEmail(
   } else if (stage === 'final') {
     await updateLeadStatus(leadId, 'completed');
   }
+
+  console.log(`[sending] lead ${leadId} stage '${stage}' sent successfully`);
 }
 
 /**
