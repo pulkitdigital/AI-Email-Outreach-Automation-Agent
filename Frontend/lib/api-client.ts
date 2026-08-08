@@ -161,7 +161,7 @@ export function confirmLead(
   return request(`/api/leads/${id}/confirm`, { method: 'POST', body: JSON.stringify(patch) });
 }
 
-export function deleteLead(id: string): Promise<{ id: string; deletedAt: string | null }> {
+export function deleteLead(id: string): Promise<{ id: string; status: string }> {
   return request(`/api/leads/${id}`, { method: 'DELETE' });
 }
 

@@ -9,7 +9,7 @@ vi.mock('../../pool.js', () => ({
   pool: { connect: connectMock, query: poolQueryMock },
 }));
 
-const { upsertLead, updateLeadStatus, setLeadStatusManually, softDeleteLead } = await import(
+const { upsertLead, updateLeadStatus, setLeadStatusManually, hardDeleteLead } = await import(
   '../leadsRepository.js'
 );
 
@@ -219,29 +219,26 @@ describe('setLeadStatusManually', () => {
   });
 });
 
-describe('softDeleteLead', () => {
+describe('hardDeleteLead', () => {
   beforeEach(() => {
     poolQueryMock.mockReset();
   });
 
-  it('sets deleted_at and only matches a currently-active row', async () => {
-    poolQueryMock.mockResolvedValue({
-      rows: [baseExisting({ deletedAt: new Date('2026-01-02') })],
-    });
+  it('issues a real DELETE against the row', async () => {
+    poolQueryMock.mockResolvedValue({ rows: [baseExisting()] });
 
-    const result = await softDeleteLead('lead-1');
+    const result = await hardDeleteLead('lead-1');
 
     const [sql, params] = poolQueryMock.mock.calls[0]!;
-    expect(sql).toContain('deleted_at = now()');
-    expect(sql).toContain('deleted_at IS NULL');
+    expect(sql).toContain('DELETE FROM leads');
     expect(params).toEqual(['lead-1']);
-    expect(result?.deletedAt).toEqual(new Date('2026-01-02'));
+    expect(result?.id).toBe('lead-1');
   });
 
-  it('is a no-op (returns null) when the lead is already deleted', async () => {
+  it('resolves to null when no row matched (already gone)', async () => {
     poolQueryMock.mockResolvedValue({ rows: [] });
 
-    const result = await softDeleteLead('lead-1');
+    const result = await hardDeleteLead('lead-1');
 
     expect(result).toBeNull();
   });

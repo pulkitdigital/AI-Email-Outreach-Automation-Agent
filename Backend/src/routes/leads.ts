@@ -5,7 +5,6 @@ import {
   getLeadById,
   listLeads,
   setLeadStatusManually,
-  softDeleteLead,
   updateLeadFields,
   type ListLeadsFilters,
 } from '../db/repositories/leadsRepository.js';
@@ -14,6 +13,7 @@ import { getSequenceForLead } from '../db/repositories/emailSequencesRepository.
 import { getLatestPitchDeckForLead } from '../db/repositories/pitchDecksRepository.js';
 import { listSentEmailLogsForLead } from '../db/repositories/sentEmailsLogRepository.js';
 import { confirmLead } from '../modules/leads/leadReviewService.js';
+import { deleteLead } from '../modules/leads/leadDeletionService.js';
 import { LeadReviewPreconditionError } from '../modules/leads/errors.js';
 import type { MergeableLeadFields } from '../modules/ingestion/normalize.js';
 import {
@@ -228,10 +228,11 @@ leadsRouter.patch('/:id/status', async (req, res) => {
 });
 
 /**
- * DELETE /api/leads/:id — the dashboard's per-row "Delete" action. Always archives (soft-delete)
- * rather than removing the row — see softDeleteLead's docstring for why a hard delete isn't safe
- * here (sent_emails_log/email_sequences CASCADE off leads.id, so it would destroy send history).
- * Idempotent: deleting an already-archived lead just returns it unchanged rather than erroring.
+ * DELETE /api/leads/:id — the dashboard's per-row "Delete" action. Permanently removes the lead
+ * row plus everything that cascades off it (pitch_decks, email_sequences, sent_emails_log,
+ * replies, lead_secondary_categories) and any R2-stored deck files — see
+ * modules/leads/leadDeletionService.ts. Irreversible; the Frontend gates this behind an explicit
+ * confirmation dialog (see Frontend/components/delete-lead-dialog.tsx).
  */
 leadsRouter.delete('/:id', async (req, res) => {
   try {
@@ -241,8 +242,8 @@ leadsRouter.delete('/:id', async (req, res) => {
       return;
     }
 
-    const archived = (await softDeleteLead(req.params.id)) ?? lead;
-    res.json({ id: archived.id, deletedAt: archived.deletedAt });
+    const deleted = (await deleteLead(req.params.id)) ?? lead;
+    res.json({ id: deleted.id, status: 'deleted' });
   } catch (err) {
     console.error(`[leads-route] failed to delete lead ${req.params.id}:`, err);
     res.status(500).json({ error: 'Failed to delete lead — see server logs for details' });

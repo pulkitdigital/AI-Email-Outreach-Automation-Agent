@@ -103,6 +103,15 @@ export async function getLatestPitchDeckForLead(leadId: string): Promise<PitchDe
   return (rows[0] as PitchDeckRecord | undefined) ?? null;
 }
 
+/** Every deck a lead has ever had (not just the latest) — see modules/leads/leadDeletionService.ts, which needs every file_key/pdf_file_key to clean up before a hard delete. */
+export async function getAllPitchDecksForLead(leadId: string): Promise<PitchDeckRecord[]> {
+  const { rows } = await pool.query(
+    `SELECT ${PITCH_DECK_COLUMNS} FROM pitch_decks WHERE lead_id = $1 ORDER BY created_at DESC`,
+    [leadId],
+  );
+  return rows as PitchDeckRecord[];
+}
+
 export interface UpdatePitchDeckStatusInput {
   status: PitchDeckGenerationStatus;
   generationError?: string | null;

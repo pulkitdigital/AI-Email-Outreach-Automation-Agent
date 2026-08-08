@@ -21,9 +21,10 @@ interface DeleteLeadDialogProps {
 }
 
 /**
- * Per-row "Delete" action on the Leads table. Always archives (soft-delete, see
- * Backend/src/routes/leads.ts's DELETE /api/leads/:id) rather than permanently removing the
- * lead — the confirmation copy reflects that: it leaves the active view, not the database.
+ * Per-row "Delete" action on the Leads table. Permanently removes the lead (see
+ * Backend/src/routes/leads.ts's DELETE /api/leads/:id and
+ * Backend/src/modules/leads/leadDeletionService.ts) — irreversible, so the confirmation copy
+ * says so explicitly rather than implying it's recoverable.
  */
 export function DeleteLeadDialog({ leadId, leadLabel }: DeleteLeadDialogProps) {
   const [open, setOpen] = useState(false);
@@ -32,7 +33,7 @@ export function DeleteLeadDialog({ leadId, leadLabel }: DeleteLeadDialogProps) {
   function handleDelete() {
     deleteLead.mutate(leadId, {
       onSuccess: () => {
-        toast.success(`${leadLabel} removed from active leads`);
+        toast.success(`${leadLabel} permanently deleted`);
         setOpen(false);
       },
       onError: (err) => toast.error(err instanceof Error ? err.message : 'Failed to delete lead'),
@@ -55,8 +56,8 @@ export function DeleteLeadDialog({ leadId, leadLabel }: DeleteLeadDialogProps) {
         <DialogHeader>
           <DialogTitle>Delete lead?</DialogTitle>
           <DialogDescription>
-            Are you sure? This will remove {leadLabel} from the active view. Its email/sequence
-            history is kept, and this can be undone from the database if needed.
+            Permanently delete {leadLabel} and all its email/sequence history. This cannot be
+            undone.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

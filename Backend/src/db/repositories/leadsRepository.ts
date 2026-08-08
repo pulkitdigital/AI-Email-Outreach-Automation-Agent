@@ -466,17 +466,24 @@ export async function setLeadStatusManually(
 }
 
 /**
- * Archives a lead (dashboard's per-row "Delete" action) rather than removing the row: sent_emails_log
- * and email_sequences both reference leads with ON DELETE CASCADE (see
- * Backend/src/db/migrations/0001_init.sql), so a hard delete would silently destroy send/reply
- * history for any lead that has ever been emailed. Soft-deleting instead just excludes the lead
- * from the default list views (listLeads/listLeadIdsByStatus/findLeadByNormalizedEmail already
- * filter `deleted_at IS NULL`) while every other row referencing it stays intact. Idempotent:
- * re-deleting an already-deleted lead is a no-op (the WHERE clause only matches non-deleted rows).
+ * Permanently removes a lead row (dashboard's per-row "Delete" action). pitch_decks,
+ * email_sequences, sent_emails_log, replies, and lead_secondary_categories all reference leads
+ * with ON DELETE CASCADE (see Backend/src/db/migrations/0001_init.sql / 0002_categorization.sql),
+ * so this single DELETE lets Postgres remove every related row atomically — no manual multi-table
+ * deletes or a new migration needed, the schema was already built for this. whatsapp_messages_log
+ * instead has ON DELETE SET NULL (0008_whatsapp_channel.sql) and survives, unlinked, as a
+ * message-history audit trail, same as ingestion_jobs (leads.ingestion_job_id → SET NULL, the
+ * other direction). Deliberately hard, not soft: a lead is deleted specifically so a later
+ * re-ingestion of the same email is treated as brand new (see upsertLead's
+ * UNIQUE(email_normalized) conflict path) rather than merging into a dead row — soft-deleting
+ * couldn't achieve that, since the UNIQUE constraint still held the email regardless of
+ * deleted_at. Callers must delete any R2-stored deck files BEFORE calling this (the pitch_decks
+ * rows, and their file_key/pdf_file_key pointers, are gone the moment this returns) — see
+ * modules/leads/leadDeletionService.ts, the only intended caller.
  */
-export async function softDeleteLead(id: string): Promise<LeadRecord | null> {
+export async function hardDeleteLead(id: string): Promise<LeadRecord | null> {
   const { rows } = await pool.query(
-    `UPDATE leads SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL RETURNING ${LEAD_COLUMNS}`,
+    `DELETE FROM leads WHERE id = $1 RETURNING ${LEAD_COLUMNS}`,
     [id],
   );
   return (rows[0] as LeadRecord | undefined) ?? null;
