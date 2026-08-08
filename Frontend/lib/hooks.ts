@@ -247,6 +247,20 @@ export function useUpdateSchedulerCron() {
   });
 }
 
+export function useSenderIdentity() {
+  return useQuery({ queryKey: ['senderIdentity'], queryFn: api.getSenderIdentity });
+}
+
+export function useUpdateSenderIdentity() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: api.SenderIdentityResponse) => api.updateSenderIdentity(input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['senderIdentity'] });
+    },
+  });
+}
+
 export function useSendWhatsAppMessage(leadId: string) {
   const queryClient = useQueryClient();
   return useMutation({

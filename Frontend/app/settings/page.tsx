@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { useSchedulerCron, useUpdateSchedulerCron } from '@/lib/hooks';
+import { useSchedulerCron, useSenderIdentity, useUpdateSchedulerCron, useUpdateSenderIdentity } from '@/lib/hooks';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -37,6 +37,31 @@ export default function SettingsPage() {
   const { data, isLoading, isError, error } = useSchedulerCron();
   const updateCron = useUpdateSchedulerCron();
   const [timeValue, setTimeValue] = useState('');
+
+  const identityQuery = useSenderIdentity();
+  const updateIdentity = useUpdateSenderIdentity();
+  const [nameValue, setNameValue] = useState('');
+  const [designationValue, setDesignationValue] = useState('');
+  const [companyNameValue, setCompanyNameValue] = useState('');
+
+  useEffect(() => {
+    if (!identityQuery.data) return;
+    setNameValue(identityQuery.data.name);
+    setDesignationValue(identityQuery.data.designation);
+    setCompanyNameValue(identityQuery.data.companyName);
+  }, [identityQuery.data]);
+
+  const handleSaveIdentity = () => {
+    if (!nameValue.trim() || !designationValue.trim() || !companyNameValue.trim()) return;
+    updateIdentity.mutate(
+      { name: nameValue.trim(), designation: designationValue.trim(), companyName: companyNameValue.trim() },
+      {
+        onSuccess: () => toast.success('Sender identity updated'),
+        onError: (err) =>
+          toast.error(err instanceof Error ? err.message : 'Failed to update sender identity'),
+      },
+    );
+  };
 
   useEffect(() => {
     if (!data) return;
@@ -104,6 +129,71 @@ export default function SettingsPage() {
                   {updateCron.isPending ? 'Saving…' : 'Save'}
                 </Button>
               </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Sender Identity</CardTitle>
+          <CardDescription>
+            The name, title, and company used in outbound email signatures and the AI composer.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {identityQuery.isError && (
+            <p className="text-sm text-destructive">
+              Failed to load sender identity:{' '}
+              {identityQuery.error instanceof Error ? identityQuery.error.message : 'Unknown error'}
+            </p>
+          )}
+          {identityQuery.isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+          {identityQuery.data && (
+            <>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="sender-name">Name</Label>
+                  <Input
+                    id="sender-name"
+                    value={nameValue}
+                    onChange={(e) => setNameValue(e.target.value)}
+                    maxLength={100}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="sender-designation">Designation</Label>
+                  <Input
+                    id="sender-designation"
+                    value={designationValue}
+                    onChange={(e) => setDesignationValue(e.target.value)}
+                    maxLength={100}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="sender-company">Company Name</Label>
+                  <Input
+                    id="sender-company"
+                    value={companyNameValue}
+                    onChange={(e) => setCompanyNameValue(e.target.value)}
+                    maxLength={100}
+                  />
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Preview: {nameValue || '—'} / {designationValue || '—'}, {companyNameValue || '—'}
+              </p>
+              <Button
+                onClick={handleSaveIdentity}
+                disabled={
+                  !nameValue.trim() ||
+                  !designationValue.trim() ||
+                  !companyNameValue.trim() ||
+                  updateIdentity.isPending
+                }
+              >
+                {updateIdentity.isPending ? 'Saving…' : 'Save'}
+              </Button>
             </>
           )}
         </CardContent>

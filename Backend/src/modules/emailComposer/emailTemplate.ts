@@ -1,7 +1,4 @@
-import { env } from '../../config/env.js';
-
 const CONTACT = {
-  companyName: 'BeBeyond Digital Solutions',
   email: 'info@bebeyond.digital',
   phone: '+91 99 1867 1867',
   website: 'https://www.bebeyond.digital/',
@@ -28,6 +25,10 @@ export interface RenderEmailInput {
   unsubscribeUrl: string;
   /** Click-to-WhatsApp link (see modules/whatsapp/clickToWhatsapp.ts) — omitted/null renders no WhatsApp line, the same as before this existed. Behind WHATSAPP_CTA_ENABLED, default off. */
   whatsappCtaUrl?: string | null;
+  /** DB-driven (falls back to env/hardcoded defaults) — see modules/senderIdentity/senderIdentityService.ts. Fetched once by the caller (composerService.ts) rather than read here, so a single compose only hits the DB/cache once. */
+  senderName: string;
+  senderDesignation: string;
+  senderCompanyName: string;
 }
 
 /**
@@ -59,8 +60,8 @@ export function renderEmailHtml(input: RenderEmailInput): string {
     ${paragraphsHtml}
     ${whatsappHtml}
     <p>Best,<br />
-    ${escapeHtml(env.SENDER_PERSON_NAME)}<br />
-    ${escapeHtml(CONTACT.companyName)}<br />
+    ${escapeHtml(input.senderName)}<br />
+    ${escapeHtml(input.senderDesignation)}, ${escapeHtml(input.senderCompanyName)}<br />
     ${escapeHtml(CONTACT.email)} | ${escapeHtml(CONTACT.phone)}<br />
     <a href="${CONTACT.website}">${CONTACT.websiteLabel}</a></p>
     <p>If you'd rather not hear from us, just reply and let me know — or <a href="${escapeHtml(input.unsubscribeUrl)}">opt out here</a>.</p>
@@ -93,8 +94,8 @@ export function renderEmailText(input: RenderEmailInput): string {
     ...input.paragraphs.flatMap((p) => [p, '']),
     ...(input.whatsappCtaUrl ? [`Prefer WhatsApp? You can message us there: ${input.whatsappCtaUrl}`, ''] : []),
     'Best,',
-    env.SENDER_PERSON_NAME,
-    CONTACT.companyName,
+    input.senderName,
+    `${input.senderDesignation}, ${input.senderCompanyName}`,
     `${CONTACT.email} | ${CONTACT.phone}`,
     CONTACT.website,
     '',

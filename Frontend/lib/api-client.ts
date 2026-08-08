@@ -348,3 +348,22 @@ export function updateSchedulerCron(
     body: JSON.stringify({ cron }),
   });
 }
+
+export interface SenderIdentityResponse {
+  name: string;
+  designation: string;
+  companyName: string;
+}
+
+export function getSenderIdentity(): Promise<SenderIdentityResponse> {
+  return request('/api/settings/sender-identity');
+}
+
+export function updateSenderIdentity(
+  input: SenderIdentityResponse,
+): Promise<SenderIdentityResponse & { status: string }> {
+  return request('/api/settings/sender-identity', {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+}

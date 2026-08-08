@@ -8,6 +8,7 @@ import type {
   UnsubscribeResult,
 } from '@bebeyond/shared';
 import { env } from '../../config/env.js';
+import { getSenderIdentity } from '../../modules/senderIdentity/senderIdentityService.js';
 import { EmailApiError, EmailConfigError, isRetryableStatusCode } from './errors.js';
 
 /**
@@ -48,6 +49,11 @@ export class BrevoProvider implements EmailProvider {
    */
   async sendEmail(params: SendEmailParams): Promise<SendEmailResult> {
     const client = this.getClient();
+    // DB-driven (falls back to env/hardcoded defaults), same source composerService.ts uses for
+    // the in-body signature — see modules/senderIdentity/senderIdentityService.ts. Cached with a
+    // short TTL there, so this is a cache hit in the common case, not a fresh DB round-trip per
+    // send.
+    const identity = await getSenderIdentity();
 
     try {
       const result = await client.transactionalEmails.sendTransacEmail({
@@ -55,8 +61,8 @@ export class BrevoProvider implements EmailProvider {
           email: env.BREVO_SENDER_EMAIL,
           // A bare company name in the "From" display reads as agency/bulk mail — one of the
           // signals that pushes cold outreach into Gmail's Promotions tab. Leading with the
-          // sender's actual name (SENDER_PERSON_NAME) makes this look like a 1:1 email instead.
-          name: `${env.SENDER_PERSON_NAME} from ${env.BREVO_SENDER_NAME || 'BeBeyond'}`,
+          // sender's actual name makes this look like a 1:1 email instead.
+          name: `${identity.name} from ${identity.companyName}`,
         },
         to: [{ email: params.to, name: params.toName }],
         subject: params.subject,

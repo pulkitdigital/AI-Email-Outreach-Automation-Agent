@@ -1,4 +1,5 @@
 import { getAIProvider } from '../../providers/ai/index.js';
+import { getSenderIdentity } from '../senderIdentity/senderIdentityService.js';
 import { buildFallbackCopy } from './fallbackTemplates.js';
 import { renderEmailHtml, renderEmailText } from './emailTemplate.js';
 import type { ComposeEmailInput, ComposedEmail } from './types.js';
@@ -15,6 +16,11 @@ export async function composeEmail(input: ComposeEmailInput): Promise<ComposedEm
   let paragraphs: string[];
   let usedAiCopy: boolean;
 
+  // Fetched once per compose call (not once per use site) — getSenderIdentity() is cached with a
+  // short TTL internally, but there's no reason to pay even a cache lookup twice for the same
+  // compose. Reused below for both the AI prompt's self-identification and the signature block.
+  const senderIdentity = await getSenderIdentity();
+
   try {
     const aiResult = await getAIProvider().generateEmailCopy({
       companyName: input.companyName,
@@ -23,6 +29,9 @@ export async function composeEmail(input: ComposeEmailInput): Promise<ComposedEm
       primaryCategoryName: input.primaryCategoryName,
       primaryCategoryServices: input.primaryCategoryServices,
       stage: input.stage,
+      senderName: senderIdentity.name,
+      senderDesignation: senderIdentity.designation,
+      senderCompanyName: senderIdentity.companyName,
     });
     subject = aiResult.subject;
     paragraphs = aiResult.bodyParagraphs;
@@ -52,12 +61,18 @@ export async function composeEmail(input: ComposeEmailInput): Promise<ComposedEm
     paragraphs,
     unsubscribeUrl: input.unsubscribeUrl,
     whatsappCtaUrl: input.whatsappCtaUrl,
+    senderName: senderIdentity.name,
+    senderDesignation: senderIdentity.designation,
+    senderCompanyName: senderIdentity.companyName,
   });
   const text = renderEmailText({
     greetingName,
     paragraphs,
     unsubscribeUrl: input.unsubscribeUrl,
     whatsappCtaUrl: input.whatsappCtaUrl,
+    senderName: senderIdentity.name,
+    senderDesignation: senderIdentity.designation,
+    senderCompanyName: senderIdentity.companyName,
   });
 
   return { subject, html, text, usedAiCopy };

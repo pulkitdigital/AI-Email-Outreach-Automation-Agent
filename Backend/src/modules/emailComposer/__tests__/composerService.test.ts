@@ -5,6 +5,11 @@ vi.mock('../../../providers/ai/index.js', () => ({
   getAIProvider: () => ({ generateEmailCopy: generateEmailCopyMock }),
 }));
 
+vi.mock('../../senderIdentity/senderIdentityService.js', () => ({
+  getSenderIdentity: () =>
+    Promise.resolve({ name: 'Pulkit', designation: 'Founder', companyName: 'BeBeyond Digital Solutions' }),
+}));
+
 const { composeEmail } = await import('../composerService.js');
 
 const baseInput = {

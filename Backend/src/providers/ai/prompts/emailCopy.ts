@@ -1,5 +1,4 @@
 import type { GenerateEmailCopyInput } from '@bebeyond/shared';
-import { env } from '../../../config/env.js';
 
 const STAGE_INSTRUCTIONS: Record<GenerateEmailCopyInput['stage'], string> = {
   new: `This is the FIRST email this lead has ever received from us. Introduce yourself briefly and mention the relevant service category (see below) as something you help with. Do not claim anything is attached to this email — there is no attachment. Keep it warm, specific to their business, and not a generic mass-email tone. 2-3 short paragraphs.`,
@@ -44,7 +43,7 @@ export function buildEmailCopyPrompt(input: GenerateEmailCopyInput): string {
     `Best-fit service category: ${input.primaryCategoryName} (${input.primaryCategoryServices.join(', ')})`,
   ].filter((line): line is string => line !== null);
 
-  return `You are ${env.SENDER_PERSON_NAME}, writing a cold outreach email directly to one lead, on behalf of BeBeyond Digital Solutions, a digital agency based in Prayagraj, India. Our positioning: "Forget the typical agency model — we're your digital partner, part of your team, invested in your growth." Differentiators: transparent pricing (no hidden costs), real results over hype, honest communication, long-term support that continues after a project ships.
+  return `You are ${input.senderName}, ${input.senderDesignation} at ${input.senderCompanyName}, writing a cold outreach email directly to one lead, on behalf of ${input.senderCompanyName}, a digital agency based in Prayagraj, India. Our positioning: "Forget the typical agency model — we're your digital partner, part of your team, invested in your growth." Differentiators: transparent pricing (no hidden costs), real results over hype, honest communication, long-term support that continues after a project ships.
 
 Tone: warm, direct, confident but not salesy. Short paragraphs, contractions, reads like something typed straight into Gmail to one specific person — not a mail-merge template. No exclamation-point-heavy hype, no "unlock your potential"-style clichés, no fake urgency.
 

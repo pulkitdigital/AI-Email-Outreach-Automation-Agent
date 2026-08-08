@@ -20,11 +20,15 @@ describe('renderEmailHtml', () => {
     greetingName: 'Jane',
     paragraphs: ['First paragraph.', 'Second paragraph.'],
     unsubscribeUrl: 'https://example.com/unsubscribe/lead-1/token',
+    senderName: 'Pulkit',
+    senderDesignation: 'Founder',
+    senderCompanyName: 'BeBeyond Digital Solutions',
   };
 
-  it('always includes the signature block and a working opt-out link', () => {
+  it('always includes the signature block (name, designation, company) and a working opt-out link', () => {
     const html = renderEmailHtml(baseInput);
-    expect(html).toContain('Digital Solutions');
+    expect(html).toContain('Pulkit');
+    expect(html).toContain('Founder, BeBeyond Digital Solutions');
     expect(html).toContain('info@bebeyond.digital');
     expect(html).toContain('+91 99 1867 1867');
     expect(html).toContain(`href="${baseInput.unsubscribeUrl}"`);
@@ -83,10 +87,14 @@ describe('renderEmailText', () => {
       greetingName: 'Jane',
       paragraphs: ['Hello there.'],
       unsubscribeUrl: 'https://example.com/unsubscribe/lead-1/token',
+      senderName: 'Pulkit',
+      senderDesignation: 'Founder',
+      senderCompanyName: 'BeBeyond Digital Solutions',
     });
     expect(text).toContain('Hi Jane,');
     expect(text).toContain('Hello there.');
-    expect(text).toContain('BeBeyond Digital Solutions');
+    expect(text).toContain('Pulkit');
+    expect(text).toContain('Founder, BeBeyond Digital Solutions');
     expect(text).toContain('info@bebeyond.digital');
     expect(text).toContain('rather not hear from us');
     expect(text).toContain('https://example.com/unsubscribe/lead-1/token');

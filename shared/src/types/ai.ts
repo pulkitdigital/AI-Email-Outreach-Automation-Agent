@@ -144,6 +144,12 @@ export interface GenerateEmailCopyInput {
   primaryCategoryName: string;
   primaryCategoryServices: string[];
   stage: 'new' | 'followup' | 'final';
+  /** Sender's self-identification for the prompt (name, job title, company) — DB-driven, see
+   *  Backend/src/modules/senderIdentity/senderIdentityService.ts. Not the signature block itself
+   *  (composerService.ts adds that separately, outside the AI's output). */
+  senderName: string;
+  senderDesignation: string;
+  senderCompanyName: string;
 }
 
 export interface GenerateEmailCopyResult {
