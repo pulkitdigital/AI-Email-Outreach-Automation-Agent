@@ -1,6 +1,13 @@
-import type { CategoryMatch, ClassifyCategoryResult, LeadStatus } from '@bebeyond/shared';
+import type { CategorizeLeadResult, CategoryMatch, ClassifyCategoryResult, LeadStatus } from '@bebeyond/shared';
 import { env } from '../../config/env.js';
-import { getCategoryById, listActiveCategories } from '../../db/repositories/categoriesRepository.js';
+import {
+  createCategory,
+  findCategoryBySlug,
+  getCategoryById,
+  isSlugUniqueViolation,
+  listActiveCategories,
+  type CategoryRecord,
+} from '../../db/repositories/categoriesRepository.js';
 import { listActiveCategorizationRules } from '../../db/repositories/categorizationRulesRepository.js';
 import {
   replaceSecondaryCategories,
@@ -9,6 +16,7 @@ import {
 import { getLeadById, updateLeadCategorization } from '../../db/repositories/leadsRepository.js';
 import { getAIProvider } from '../../providers/ai/index.js';
 import { AIConfigError, isQuotaOrRateLimitError } from '../../providers/ai/errors.js';
+import { generateAndStoreCategoryContent } from '../categoryContent/categoryContentGenerationService.js';
 import { triggerDeckGeneration } from '../deckGeneration/deckGenerationService.js';
 import { evaluateRules, MAX_SECONDARY_CATEGORIES } from './ruleEngine.js';
 
@@ -69,6 +77,54 @@ async function maybeTriggerDeckGeneration(
     await triggerDeckGeneration(leadId);
   } catch (err) {
     console.error(`[categorization] failed to trigger deck generation for lead ${leadId}:`, err);
+  }
+}
+
+/**
+ * Resolves the AIProvider's suggestedNewCategory proposal to an actual categories row —
+ * race-safe against another concurrent categorizeLead() call proposing the same slug (a real
+ * scenario: two leads landing in the same brand-new category around the same time). Tries a
+ * plain lookup-by-slug first (cheap, and correctly reuses an already-existing category — whether
+ * pre-existing or created moments ago by the losing side of a race elsewhere); only inserts when
+ * that comes back empty, and if the insert itself loses a race (categories.slug is UNIQUE — see
+ * migrations/0001_init.sql), re-fetches and uses the winner's row instead of erroring.
+ *
+ * `wasCreated` tells the caller whether THIS call is the one that just created the category —
+ * only the creator should trigger content generation, never a re-lookup of an
+ * already-existing/already-being-handled row.
+ */
+async function findOrCreateSuggestedCategory(
+  suggestion: NonNullable<CategorizeLeadResult['suggestedNewCategory']>,
+): Promise<{ category: CategoryRecord; wasCreated: boolean }> {
+  const existing = await findCategoryBySlug(suggestion.slug);
+  if (existing) {
+    return { category: existing, wasCreated: false };
+  }
+
+  try {
+    const created = await createCategory({
+      name: suggestion.name,
+      slug: suggestion.slug,
+      // Never the AI's raw proposed value — categories.service_group's CHECK constraint still
+      // fixes it to the original 4 groups (see SuggestedNewCategory's doc, shared/src/types/ai.ts).
+      // Logged below instead of persisted, so the proposal isn't lost without being force-fit
+      // into a column it can't validly hold.
+      serviceGroup: null,
+      needsReview: true,
+      reviewReason: 'ai_created_new_category',
+    });
+    console.log(
+      `[categorization] created new category "${created.name}" (slug: ${created.slug}, id: ${created.id}) — ` +
+        `AI's proposed service group was "${suggestion.serviceGroup}" (not persisted; categories.service_group ` +
+        'is fixed to the original 4 values by a DB CHECK constraint)',
+    );
+    return { category: created, wasCreated: true };
+  } catch (err) {
+    if (isSlugUniqueViolation(err)) {
+      const winner = await findCategoryBySlug(suggestion.slug);
+      if (winner) return { category: winner, wasCreated: false };
+    }
+    throw err;
   }
 }
 
@@ -134,6 +190,44 @@ export async function categorizeLead(leadId: string): Promise<void> {
     aiResult.categoryId !== null && aiConfidence >= env.AI_CATEGORIZATION_MIN_CONFIDENCE;
 
   if (!isTrustworthy) {
+    // The parser (categorizationResponse.ts) only ever sets suggestedNewCategory when
+    // primaryCategoryId is null, so this can't fire for the "non-null id, just low confidence"
+    // sub-case of !isTrustworthy — only for the "genuinely no existing category fits" one.
+    if (aiResult.suggestedNewCategory) {
+      const { category, wasCreated } = await findOrCreateSuggestedCategory(
+        aiResult.suggestedNewCategory,
+      );
+
+      // Only the creator generates content — a category found via lookup (pre-existing, or a
+      // race we lost) either already has content or is already someone else's problem to backfill.
+      if (wasCreated) {
+        try {
+          await generateAndStoreCategoryContent(category);
+        } catch (err) {
+          console.error(
+            `[categorization] category "${category.name}" (${category.id}) created without deck ` +
+              'content — content generation failed, needs manual backfill ' +
+              '(scripts/backfillCategoryContent.ts will pick it up):',
+            err,
+          );
+        }
+      }
+
+      await updateLeadCategorization(leadId, {
+        categoryId: category.id,
+        categorizationMethod: 'ai',
+        categorizationConfidence: aiConfidence,
+        status: nextStatusIfAdvancing('categorized'),
+        reviewReason: null,
+      });
+      await replaceSecondaryCategories(
+        leadId,
+        mergeSecondaries(ruleResult.secondary, aiResult.secondaryCategoryIds ?? [], aiConfidence, null),
+      );
+      await maybeTriggerDeckGeneration(leadId, lead.categoryId, category.id);
+      return;
+    }
+
     await updateLeadCategorization(leadId, {
       categoryId: null,
       categorizationMethod: 'ai',

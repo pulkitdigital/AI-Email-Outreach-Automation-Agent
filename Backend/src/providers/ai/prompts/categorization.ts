@@ -23,10 +23,19 @@ ${categoryList}
 Lead information:
 ${leadSummaryLines.length > 0 ? leadSummaryLines.join('\n') : '(no additional information available)'}
 
+Look carefully at the existing categories list above first. Only if the lead genuinely does not fit ANY of them — not even loosely — propose a brand-new category instead of forcing a bad fit. Be conservative: most leads should match an existing category.
+
 Respond with ONLY a JSON object in exactly this shape, no other text, no markdown fences:
 {
   "primaryCategoryId": "<one of the ids listed above, or null if genuinely no category fits>",
   "confidence": <number between 0 and 1 — how confident you are in the primary category>,
-  "secondaryCategoryIds": [<0 to 2 additional ids from the list above that are also a plausible fit>]
-}`;
+  "secondaryCategoryIds": [<0 to 2 additional ids from the list above that are also a plausible fit>],
+  "suggestedNewCategory": {
+    "name": "<Title Case category name, e.g. 'Home Renovation'>",
+    "slug": "<kebab-case, e.g. 'home-renovation'>",
+    "serviceGroup": "<snake_case, e.g. 'home_renovation'>"
+  } | null
+}
+
+suggestedNewCategory must be null whenever primaryCategoryId is non-null. When primaryCategoryId is null, set suggestedNewCategory to a proposal only if you're confident this is a real, distinct, recurring category of business (not a one-off) — otherwise leave it null too.`;
 }

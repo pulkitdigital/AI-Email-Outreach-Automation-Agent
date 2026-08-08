@@ -7,6 +7,8 @@ import type {
   ClassifyCategoryResult,
   ExtractLeadFieldsFromTextInput,
   ExtractLeadFieldsFromTextResult,
+  GenerateCategoryContentInput,
+  GenerateCategoryContentResult,
   GenerateDeckContentInput,
   GenerateDeckContentResult,
   GenerateEmailCopyInput,
@@ -15,16 +17,18 @@ import type {
 import { env } from '../../config/env.js';
 import { parseCategorizationResponse } from './categorizationResponse.js';
 import { parseCategoryClassificationResponse } from './categoryClassificationResponse.js';
+import { parseCategoryContentResponse } from './categoryContentResponse.js';
 import { parseEmailCopyResponse } from './emailCopyResponse.js';
 import { AIConfigError } from './errors.js';
 import { buildCategorizationPrompt } from './prompts/categorization.js';
 import { buildCategoryClassificationPrompt } from './prompts/categoryClassification.js';
+import { buildCategoryContentPrompt } from './prompts/categoryContent.js';
 import { buildEmailCopyPrompt } from './prompts/emailCopy.js';
 
 /**
- * Gemini implementation of AIProvider. categorizeLead (Phase 2) and generateEmailCopy
- * (Phase 4) are fully implemented; generateDeckContent and extractLeadFieldsFromText remain
- * stubbed for later phases.
+ * Gemini implementation of AIProvider. categorizeLead (Phase 2), generateEmailCopy (Phase 4), and
+ * generateCategoryContent (Phase 3 category_content migration) are fully implemented;
+ * generateDeckContent and extractLeadFieldsFromText remain stubbed for later phases.
  */
 export class GeminiProvider implements AIProvider {
   private client: GoogleGenerativeAI | null = null;
@@ -52,8 +56,7 @@ export class GeminiProvider implements AIProvider {
     const result = await model.generateContent(buildCategorizationPrompt(input));
     const text = result.response.text();
 
-    const candidateIds = new Set(input.candidateCategories.map((c) => c.id));
-    return parseCategorizationResponse(text, candidateIds);
+    return parseCategorizationResponse(text, input.candidateCategories);
   }
 
   async generateEmailCopy(input: GenerateEmailCopyInput): Promise<GenerateEmailCopyResult> {
@@ -78,6 +81,18 @@ export class GeminiProvider implements AIProvider {
 
   async generateDeckContent(_input: GenerateDeckContentInput): Promise<GenerateDeckContentResult> {
     throw new Error('GeminiProvider.generateDeckContent not implemented yet — later phase');
+  }
+
+  async generateCategoryContent(
+    input: GenerateCategoryContentInput,
+  ): Promise<GenerateCategoryContentResult> {
+    const model = this.getClient().getGenerativeModel({
+      model: env.GEMINI_MODEL,
+      generationConfig: { responseMimeType: 'application/json', temperature: 0.4 },
+    });
+
+    const result = await model.generateContent(buildCategoryContentPrompt(input));
+    return parseCategoryContentResponse(result.response.text());
   }
 
   /**

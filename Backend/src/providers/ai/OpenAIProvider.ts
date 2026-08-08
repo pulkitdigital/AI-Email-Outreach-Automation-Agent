@@ -7,6 +7,8 @@ import type {
   ClassifyCategoryResult,
   ExtractLeadFieldsFromTextInput,
   ExtractLeadFieldsFromTextResult,
+  GenerateCategoryContentInput,
+  GenerateCategoryContentResult,
   GenerateDeckContentInput,
   GenerateDeckContentResult,
   GenerateEmailCopyInput,
@@ -15,16 +17,18 @@ import type {
 import { env } from '../../config/env.js';
 import { parseCategorizationResponse } from './categorizationResponse.js';
 import { parseCategoryClassificationResponse } from './categoryClassificationResponse.js';
+import { parseCategoryContentResponse } from './categoryContentResponse.js';
 import { parseEmailCopyResponse } from './emailCopyResponse.js';
 import { AIConfigError } from './errors.js';
 import { buildCategorizationPrompt } from './prompts/categorization.js';
 import { buildCategoryClassificationPrompt } from './prompts/categoryClassification.js';
+import { buildCategoryContentPrompt } from './prompts/categoryContent.js';
 import { buildEmailCopyPrompt } from './prompts/emailCopy.js';
 
 /**
- * OpenAI implementation of AIProvider. categorizeLead (Phase 2) and generateEmailCopy
- * (Phase 4) are fully implemented; generateDeckContent and extractLeadFieldsFromText remain
- * stubbed for later phases.
+ * OpenAI implementation of AIProvider. categorizeLead (Phase 2), generateEmailCopy (Phase 4), and
+ * generateCategoryContent (Phase 3 category_content migration) are fully implemented;
+ * generateDeckContent and extractLeadFieldsFromText remain stubbed for later phases.
  */
 export class OpenAIProvider implements AIProvider {
   private client: OpenAI | null = null;
@@ -56,8 +60,7 @@ export class OpenAIProvider implements AIProvider {
       throw new Error('OpenAI categorization response had no content');
     }
 
-    const candidateIds = new Set(input.candidateCategories.map((c) => c.id));
-    return parseCategorizationResponse(text, candidateIds);
+    return parseCategorizationResponse(text, input.candidateCategories);
   }
 
   async generateEmailCopy(input: GenerateEmailCopyInput): Promise<GenerateEmailCopyResult> {
@@ -94,6 +97,24 @@ export class OpenAIProvider implements AIProvider {
 
   async generateDeckContent(_input: GenerateDeckContentInput): Promise<GenerateDeckContentResult> {
     throw new Error('OpenAIProvider.generateDeckContent not implemented yet — later phase');
+  }
+
+  async generateCategoryContent(
+    input: GenerateCategoryContentInput,
+  ): Promise<GenerateCategoryContentResult> {
+    const completion = await this.getClient().chat.completions.create({
+      model: env.OPENAI_MODEL,
+      messages: [{ role: 'user', content: buildCategoryContentPrompt(input) }],
+      response_format: { type: 'json_object' },
+      temperature: 0.4,
+    });
+
+    const text = completion.choices[0]?.message?.content;
+    if (!text) {
+      throw new Error('OpenAI category-content response had no content');
+    }
+
+    return parseCategoryContentResponse(text);
   }
 
   /**

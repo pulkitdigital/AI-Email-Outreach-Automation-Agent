@@ -13,8 +13,20 @@ vi.mock('../../../db/repositories/leadsRepository.js', () => ({
 }));
 
 const listActiveCategoriesMock = vi.fn();
+const createCategoryMock = vi.fn();
+const findCategoryBySlugMock = vi.fn();
 vi.mock('../../../db/repositories/categoriesRepository.js', () => ({
   listActiveCategories: listActiveCategoriesMock,
+  createCategory: createCategoryMock,
+  findCategoryBySlug: findCategoryBySlugMock,
+  // Real implementation (pure, no DB) — cheap enough to just import for real rather than mock.
+  isSlugUniqueViolation: (err: unknown) =>
+    typeof err === 'object' && err !== null && (err as { code?: unknown }).code === '23505',
+}));
+
+const generateAndStoreCategoryContentMock = vi.fn();
+vi.mock('../../categoryContent/categoryContentGenerationService.js', () => ({
+  generateAndStoreCategoryContent: generateAndStoreCategoryContentMock,
 }));
 
 const listActiveCategorizationRulesMock = vi.fn();
@@ -96,6 +108,9 @@ beforeEach(() => {
   classifyCategoryAiMock.mockReset();
   getAIProviderMock.mockClear();
   triggerDeckGenerationMock.mockReset();
+  createCategoryMock.mockReset();
+  findCategoryBySlugMock.mockReset();
+  generateAndStoreCategoryContentMock.mockReset();
 });
 
 describe('categorizeLead', () => {
@@ -272,6 +287,143 @@ describe('categorizeLead', () => {
   it('throws if the lead does not exist', async () => {
     getLeadByIdMock.mockResolvedValue(null);
     await expect(categorizeLead('missing-lead')).rejects.toThrow(/not found/);
+  });
+});
+
+describe('categorizeLead — AI-suggested new category (Part B)', () => {
+  const SUGGESTION = { name: 'Home Renovation', slug: 'home-renovation', serviceGroup: 'home_renovation' };
+  const NEW_CATEGORY = {
+    id: 'cat-new',
+    name: 'Home Renovation',
+    slug: 'home-renovation',
+    serviceGroup: null,
+    needsReview: true,
+    reviewReason: 'ai_created_new_category',
+  };
+
+  it('happy path: creates the category, generates its content, and categorizes the lead into it', async () => {
+    getLeadByIdMock.mockResolvedValue(baseLead());
+    listActiveCategorizationRulesMock.mockResolvedValue([]);
+    listActiveCategoriesMock.mockResolvedValue([
+      { id: 'cat-web', name: 'Web & App Solutions', serviceGroup: 'web_app_solutions' },
+    ]);
+    categorizeLeadAiMock.mockResolvedValue({
+      categoryId: null,
+      confidence: 0.2,
+      secondaryCategoryIds: [],
+      suggestedNewCategory: SUGGESTION,
+    });
+    findCategoryBySlugMock.mockResolvedValue(null);
+    createCategoryMock.mockResolvedValue(NEW_CATEGORY);
+    generateAndStoreCategoryContentMock.mockResolvedValue(undefined);
+
+    await categorizeLead('lead-1');
+
+    expect(findCategoryBySlugMock).toHaveBeenCalledWith('home-renovation');
+    expect(createCategoryMock).toHaveBeenCalledWith({
+      name: 'Home Renovation',
+      slug: 'home-renovation',
+      serviceGroup: null,
+      needsReview: true,
+      reviewReason: 'ai_created_new_category',
+    });
+    expect(generateAndStoreCategoryContentMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'cat-new', slug: 'home-renovation' }),
+    );
+    expect(updateLeadCategorizationMock).toHaveBeenCalledWith('lead-1', {
+      categoryId: 'cat-new',
+      categorizationMethod: 'ai',
+      categorizationConfidence: 0.2,
+      status: 'categorized',
+      reviewReason: null,
+    });
+    expect(triggerDeckGenerationMock).toHaveBeenCalledWith('lead-1');
+  });
+
+  it('duplicate-slug race: a losing createCategory() reuses the concurrently-created winner instead of erroring or duplicating', async () => {
+    getLeadByIdMock.mockResolvedValue(baseLead());
+    listActiveCategorizationRulesMock.mockResolvedValue([]);
+    listActiveCategoriesMock.mockResolvedValue([]);
+    categorizeLeadAiMock.mockResolvedValue({
+      categoryId: null,
+      confidence: 0.2,
+      secondaryCategoryIds: [],
+      suggestedNewCategory: SUGGESTION,
+    });
+    findCategoryBySlugMock
+      .mockResolvedValueOnce(null) // first lookup: not there yet
+      .mockResolvedValueOnce({ ...NEW_CATEGORY, id: 'cat-race-winner' }); // re-fetch after losing
+    createCategoryMock.mockRejectedValue(
+      Object.assign(new Error('duplicate key value violates unique constraint'), { code: '23505' }),
+    );
+
+    await categorizeLead('lead-1');
+
+    expect(findCategoryBySlugMock).toHaveBeenCalledTimes(2);
+    // Only the creator generates content — the race loser must not duplicate it.
+    expect(generateAndStoreCategoryContentMock).not.toHaveBeenCalled();
+    expect(updateLeadCategorizationMock).toHaveBeenCalledWith(
+      'lead-1',
+      expect.objectContaining({ categoryId: 'cat-race-winner' }),
+    );
+  });
+
+  it('reuses an already-existing category matching the suggested slug, without creating a duplicate or regenerating content', async () => {
+    getLeadByIdMock.mockResolvedValue(baseLead());
+    listActiveCategorizationRulesMock.mockResolvedValue([]);
+    listActiveCategoriesMock.mockResolvedValue([]);
+    categorizeLeadAiMock.mockResolvedValue({
+      categoryId: null,
+      confidence: 0.2,
+      secondaryCategoryIds: [],
+      suggestedNewCategory: { name: 'Hospitality', slug: 'hospitality', serviceGroup: 'hospitality' },
+    });
+    findCategoryBySlugMock.mockResolvedValue({
+      id: 'cat-hospitality',
+      name: 'Hospitality',
+      slug: 'hospitality',
+      serviceGroup: null,
+      needsReview: true,
+      reviewReason: null,
+    });
+
+    await categorizeLead('lead-1');
+
+    expect(createCategoryMock).not.toHaveBeenCalled();
+    expect(generateAndStoreCategoryContentMock).not.toHaveBeenCalled();
+    expect(updateLeadCategorizationMock).toHaveBeenCalledWith(
+      'lead-1',
+      expect.objectContaining({ categoryId: 'cat-hospitality' }),
+    );
+  });
+
+  it('still creates the category and categorizes the lead into it even when content generation fails — logs the failure for a later manual backfill instead of blocking categorization', async () => {
+    getLeadByIdMock.mockResolvedValue(baseLead());
+    listActiveCategorizationRulesMock.mockResolvedValue([]);
+    listActiveCategoriesMock.mockResolvedValue([]);
+    categorizeLeadAiMock.mockResolvedValue({
+      categoryId: null,
+      confidence: 0.2,
+      secondaryCategoryIds: [],
+      suggestedNewCategory: SUGGESTION,
+    });
+    findCategoryBySlugMock.mockResolvedValue(null);
+    createCategoryMock.mockResolvedValue(NEW_CATEGORY);
+    generateAndStoreCategoryContentMock.mockRejectedValue(new Error('AI quota exceeded'));
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(categorizeLead('lead-1')).resolves.toBeUndefined();
+
+    expect(updateLeadCategorizationMock).toHaveBeenCalledWith(
+      'lead-1',
+      expect.objectContaining({ categoryId: 'cat-new', status: 'categorized' }),
+    );
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('needs manual backfill'),
+      expect.any(Error),
+    );
+
+    consoleErrorSpy.mockRestore();
   });
 });
 

@@ -1,6 +1,6 @@
 import { env } from '../config/env.js';
 import { assertEmailProviderReady } from '../providers/email/index.js';
-import { DAILY_SCHEDULER_JOB_ID, schedulerQueue } from './queues.js';
+import { initSchedulerCron } from '../modules/scheduler/schedulerCronService.js';
 import { categorizationWorker } from './workers/categorizationWorker.js';
 import { deckGenerationWorker } from './workers/deckGenerationWorker.js';
 import { ingestionWorker } from './workers/ingestionWorker.js';
@@ -19,25 +19,23 @@ try {
 /**
  * Registers (or refreshes) the once-daily automated scheduler run — this is what makes Phase 5
  * "zero manual intervention day-to-day": once this worker process is running, the Daily
- * Scheduler fires itself on SCHEDULER_CRON (in SCHEDULER_TIMEZONE) with no further action needed.
- * upsertJobScheduler is idempotent by jobSchedulerId — safe to call on every worker boot, it just
- * updates the schedule if SCHEDULER_CRON changed rather than creating a duplicate.
+ * Scheduler fires itself on the configured cron (in SCHEDULER_TIMEZONE) with no further action
+ * needed. The cron pattern comes from the app_settings DB table first (editable from the
+ * dashboard's Settings page — see routes/settings.ts), falling back to env.SCHEDULER_CRON only
+ * when no row exists yet. upsertJobScheduler is idempotent by jobSchedulerId — safe to call on
+ * every worker boot, it just updates the schedule if the pattern changed rather than creating a
+ * duplicate.
  */
-async function registerDailySchedulerJob(): Promise<void> {
-  await schedulerQueue.upsertJobScheduler(
-    DAILY_SCHEDULER_JOB_ID,
-    { pattern: env.SCHEDULER_CRON, tz: env.SCHEDULER_TIMEZONE },
-    { name: 'run', data: { trigger: 'repeatable' } },
-  );
-  console.log(
-    `[startup] daily scheduler registered: cron '${env.SCHEDULER_CRON}' in ${env.SCHEDULER_TIMEZONE}`,
-  );
-}
-
-registerDailySchedulerJob().catch((err) => {
-  console.error('[startup] failed to register daily scheduler job:', err);
-  process.exit(1);
-});
+initSchedulerCron()
+  .then((pattern) => {
+    console.log(
+      `[startup] daily scheduler registered: cron '${pattern}' in ${env.SCHEDULER_TIMEZONE}`,
+    );
+  })
+  .catch((err) => {
+    console.error('[startup] failed to register daily scheduler job:', err);
+    process.exit(1);
+  });
 
 console.log(
   '[workers] ingestion + categorization + deck-generation + sending + scheduler workers started, waiting for jobs...',

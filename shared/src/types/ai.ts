@@ -18,6 +18,23 @@ export interface CategorizeLeadInput {
   candidateCategories: Array<{ id: string; name: string; serviceGroup: ServiceGroup | null }>;
 }
 
+/**
+ * Proposed when the model judges a lead doesn't fit ANY existing candidateCategories — an
+ * alternative to falling back to needs_review, see categorizationService.ts's handling of a null
+ * categoryId. `serviceGroup` is the model's proposed grouping in principle only: it is never
+ * persisted to categories.service_group, whose CHECK constraint still fixes it to the original 4
+ * values (digital_marketing/web_app_solutions/creative_services/marketplace_commerce) — widening
+ * that would need its own migration, out of scope here. An AI-created category is stored with
+ * service_group = null instead, the same state 'travels'/'hospitality' (pre-existing
+ * manually-created categories outside the 4 groups) are already in.
+ */
+export interface SuggestedNewCategory {
+  name: string;
+  /** kebab-case, validated by parseCategorizationResponse (Backend/src/providers/ai/categorizationResponse.ts). */
+  slug: string;
+  serviceGroup: string;
+}
+
 export interface CategorizeLeadResult {
   /** Best-fit primary category id, or null if the model genuinely couldn't pick one from candidateCategories. */
   categoryId: string | null;
@@ -25,6 +42,8 @@ export interface CategorizeLeadResult {
   confidence: number | null; // 0–1, meaningful only when method === 'ai'
   /** Optional additional plausible category ids, lower confidence than the primary. */
   secondaryCategoryIds?: string[];
+  /** Only meaningful when categoryId is null — see SuggestedNewCategory's own doc. */
+  suggestedNewCategory?: SuggestedNewCategory | null;
 }
 
 /**
@@ -62,6 +81,25 @@ export interface GenerateDeckContentInput {
 
 export interface GenerateDeckContentResult {
   sections: Record<string, string>;
+}
+
+/**
+ * Phase 3 (category_content backfill / AI-created categories): generates the two deck-slide
+ * content rows (category_content, content_type 'our_services' + 'how_can_we_help') a category
+ * needs — see Backend/src/modules/categoryContent/categoryContentGenerationService.ts, the single
+ * caller shared by the one-time backfill script and the auto-create-on-categorize flow.
+ */
+export interface GenerateCategoryContentInput {
+  categoryName: string;
+  /** Null for categories outside the 4 fixed groups (AI-created, or pre-existing manually-created ones like 'hospitality') — the prompt still works without it, just with less steering context. */
+  serviceGroup: ServiceGroup | null;
+}
+
+export interface GenerateCategoryContentResult {
+  /** 4-6 short service names, "Our Services" slide card content. */
+  services: string[];
+  /** 2-3 labels, each required to be one of staticContent.ts's 8 fixed HOW_CAN_WE_HELP labels verbatim — never a new label. */
+  relevantBenefits: string[];
 }
 
 /**
@@ -131,4 +169,5 @@ export interface AIProvider {
   ): Promise<ExtractLeadFieldsFromTextResult>;
   generateEmailCopy(input: GenerateEmailCopyInput): Promise<GenerateEmailCopyResult>;
   classifyCategory(input: ClassifyCategoryInput): Promise<ClassifyCategoryResult>;
+  generateCategoryContent(input: GenerateCategoryContentInput): Promise<GenerateCategoryContentResult>;
 }

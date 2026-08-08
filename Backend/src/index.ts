@@ -9,8 +9,11 @@ dns.setDefaultResultOrder('ipv4first');
 
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import { env } from './config/env.js';
 import { assertEmailProviderReady } from './providers/email/index.js';
+import { requireAuth } from './middleware/requireAuth.js';
+import { authRouter } from './routes/auth.js';
 import { categorizationRouter } from './routes/categorization.js';
 import { decksRouter } from './routes/decks.js';
 import { ingestionRouter } from './routes/ingestion.js';
@@ -18,6 +21,7 @@ import { leadsRouter } from './routes/leads.js';
 import { repliesRouter } from './routes/replies.js';
 import { schedulerRouter } from './routes/scheduler.js';
 import { sendingRouter } from './routes/sending.js';
+import { settingsRouter } from './routes/settings.js';
 import { systemRouter } from './routes/system.js';
 import { unsubscribeRouter } from './routes/unsubscribe.js';
 import { webhooksRouter } from './routes/webhooks.js';
@@ -46,7 +50,11 @@ const app = express();
 const allowedOrigins = env.ALLOWED_ORIGINS.split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
-app.use(cors({ origin: allowedOrigins }));
+// credentials:true is required alongside sameSite:'none' session cookies (see
+// modules/auth/authService.ts) — without it the browser won't attach/accept the cookie on
+// cross-origin requests even with an exact-origin match below.
+app.use(cors({ origin: allowedOrigins, credentials: true }));
+app.use(cookieParser());
 // `verify` stashes the raw body bytes on every request — cheap, and needed by the WhatsApp
 // webhook route to verify Meta's HMAC signature (X-Hub-Signature-256), which is computed over
 // the raw bytes, not a re-serialized JSON.stringify(req.body). See src/types/express.d.ts and
@@ -66,12 +74,22 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', emailProvider: env.EMAIL_PROVIDER, aiProvider: env.AI_PROVIDER });
 });
 
+// Mounted before the requireAuth gate below — /api/auth/login must be reachable while logged
+// out, and /logout + /me handle their own (missing/expired) token cases internally.
+app.use('/api/auth', authRouter);
+
+// Everything else under /api/* requires a valid session — this protects lead data, so it's
+// deliberately one blanket gate applied before all other /api/* routers are mounted, rather than
+// repeated per-router (a single place to audit, not N places that could each be forgotten).
+app.use('/api', requireAuth);
+
 app.use('/api/ingestion', ingestionRouter);
 app.use('/api/categorization', categorizationRouter);
 app.use('/api/decks', decksRouter);
 app.use('/api/leads', leadsRouter);
 app.use('/api/sending', sendingRouter);
 app.use('/api/scheduler', schedulerRouter);
+app.use('/api/settings', settingsRouter);
 app.use('/api/replies', repliesRouter);
 app.use('/api/system', systemRouter);
 app.use('/api/whatsapp', whatsappRouter);

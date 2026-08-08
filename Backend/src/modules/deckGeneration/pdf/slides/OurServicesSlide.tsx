@@ -3,16 +3,21 @@
  * categorization) is moved to the front and visually emphasized (border/background + a
  * "Recommended For You" badge), reusing the same orderCategoriesForLead() mapping the old
  * pptxgenjs slide (slides/ourServicesSlide.ts) already relied on — not reinvented here.
+ *
+ * Card content (displayName/services/accentColor) is DB-sourced (ctx.ourServicesCategories,
+ * fetched from category_content — see pdf/generateDeckPdf.ts's loadDeckContentFromDb) rather than
+ * the legacy hardcoded serviceCatalog.ts SERVICE_CATEGORIES array, which stays in place unused
+ * (dead code, pending a later cleanup pass) but is no longer read here.
  */
 import { Page, Text, View } from '@react-pdf/renderer';
 import { SlideBody, SlideTitle } from '../components.js';
 import { OUR_SERVICES_SUBTITLE } from '../../staticContent.js';
-import { orderCategoriesForLead, SERVICE_CATEGORIES } from '../../serviceCatalog.js';
+import { orderCategoriesForLead } from '../../serviceCatalog.js';
 import type { DeckContext } from '../../types.js';
 import { CARD_GAP, CARD_RADIUS, COLORS, FONT_BODY, FONT_HEADING, PAGE_HEIGHT, PAGE_MARGIN, PAGE_WIDTH, SPACING } from '../theme.js';
 
 export function OurServicesSlide({ ctx }: { ctx: DeckContext }) {
-  const ordered = orderCategoriesForLead(SERVICE_CATEGORIES, ctx.primaryCategorySlug);
+  const ordered = orderCategoriesForLead(ctx.ourServicesCategories, ctx.primaryCategorySlug);
   const cardWidth = (PAGE_WIDTH - 2 * PAGE_MARGIN - (ordered.length - 1) * CARD_GAP.md) / ordered.length;
 
   return (

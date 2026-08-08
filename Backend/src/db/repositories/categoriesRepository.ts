@@ -39,6 +39,19 @@ export async function categorySlugExists(slug: string): Promise<boolean> {
   return rows.length > 0;
 }
 
+export async function findCategoryBySlug(slug: string): Promise<CategoryRecord | null> {
+  const { rows } = await pool.query(
+    `SELECT ${CATEGORY_COLUMNS} FROM categories WHERE slug = $1`,
+    [slug],
+  );
+  return (rows[0] as CategoryRecord | undefined) ?? null;
+}
+
+/** Postgres error code for a UNIQUE constraint violation — categories.slug is UNIQUE (migrations/0001_init.sql), so this is what a losing concurrent createCategory() call for the same slug looks like. See categorizationService.ts's findOrCreateSuggestedCategory. */
+export function isSlugUniqueViolation(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && (err as { code?: unknown }).code === '23505';
+}
+
 export interface CreateCategoryInput {
   name: string;
   slug: string;

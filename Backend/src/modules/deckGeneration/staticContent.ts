@@ -129,18 +129,26 @@ export const HOW_CAN_WE_HELP_BY_CATEGORY: Record<string, string[]> = {
 };
 
 /**
- * Moves the benefits mapped to the lead's primary category (HOW_CAN_WE_HELP_BY_CATEGORY) to the
- * front of the grid, in that mapping's own relevance order, while preserving the relative order
- * of everything else — mirrors serviceCatalog.ts's orderCategoriesForLead() pattern: a pure
- * function so the personalization logic is unit-testable without touching react-pdf at all, with
- * the same graceful degradation (an unrecognized/missing category, or a mapping that doesn't
- * actually match any real benefit label, returns the original order unchanged rather than
- * crashing or silently dropping items).
+ * Moves the benefits mapped to the lead's primary category (benefitsByCategory — defaults to this
+ * module's own HOW_CAN_WE_HELP_BY_CATEGORY, but pdf/slides/HowCanWeHelpSlide.tsx now passes the
+ * DB-sourced ctx.howCanWeHelpByCategory instead, see pdf/generateDeckPdf.ts) to the front of the
+ * grid, in that mapping's own relevance order, while preserving the relative order of everything
+ * else — mirrors serviceCatalog.ts's orderCategoriesForLead() pattern (which already took its
+ * category list as an explicit parameter; this one only gained the equivalent parameter now, for
+ * the same DB-migration reason). The default parameter keeps every existing 2-argument call
+ * (including this file's own tests) behaviorally unchanged. Pure function, unit-testable without
+ * touching react-pdf at all, with the same graceful degradation (an unrecognized/missing category,
+ * or a mapping that doesn't actually match any real benefit label, returns the original order
+ * unchanged rather than crashing or silently dropping items).
  */
-export function orderBenefitsForLead(benefits: string[], primaryCategorySlug: string | null): string[] {
+export function orderBenefitsForLead(
+  benefits: string[],
+  primaryCategorySlug: string | null,
+  benefitsByCategory: Record<string, string[]> = HOW_CAN_WE_HELP_BY_CATEGORY,
+): string[] {
   if (!primaryCategorySlug) return benefits;
 
-  const relevant = HOW_CAN_WE_HELP_BY_CATEGORY[primaryCategorySlug];
+  const relevant = benefitsByCategory[primaryCategorySlug];
   if (!relevant || relevant.length === 0) return benefits;
 
   const front = relevant.filter((label) => benefits.includes(label));

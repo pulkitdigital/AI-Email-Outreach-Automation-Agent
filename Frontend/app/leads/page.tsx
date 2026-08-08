@@ -117,6 +117,8 @@ export default function LeadsPage() {
   const [categoryId, setCategoryId] = useState(ALL);
   const [sequenceStage, setSequenceStage] = useState(ALL);
   const [page, setPage] = useState(1);
+  const [pageInput, setPageInput] = useState('');
+  const [pageInputError, setPageInputError] = useState('');
   const pageSize = 25;
 
   const { data: categories } = useCategories();
@@ -136,6 +138,17 @@ export default function LeadsPage() {
   });
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / pageSize)) : 1;
+
+  const jumpToPage = () => {
+    const n = parseInt(pageInput, 10);
+    if (isNaN(n) || String(n) !== pageInput.trim() || n < 1 || n > totalPages) {
+      setPageInputError(`Enter a page between 1 and ${totalPages}`);
+      return;
+    }
+    setPage(n);
+    setPageInput('');
+    setPageInputError('');
+  };
 
   return (
     <div className="space-y-6">
@@ -217,6 +230,34 @@ export default function LeadsPage() {
               ))}
             </SelectContent>
           </Select>
+          <div className="ml-auto flex items-start gap-2">
+            <div>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  placeholder="Page #"
+                  value={pageInput}
+                  onChange={(e) => {
+                    setPageInput(e.target.value);
+                    if (pageInputError) setPageInputError('');
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') jumpToPage();
+                  }}
+                  aria-invalid={pageInputError ? true : undefined}
+                  className="w-24"
+                />
+                <Button variant="outline" size="sm" onClick={jumpToPage}>
+                  Go
+                </Button>
+              </div>
+              {pageInputError && (
+                <p className="mt-1 text-xs text-destructive">{pageInputError}</p>
+              )}
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -261,6 +302,7 @@ export default function LeadsPage() {
                   ))}
                 </TableBody>
               </Table>
+
 
               <div className="mt-4 flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">

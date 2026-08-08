@@ -125,7 +125,17 @@
       "Bash(rm -f /tmp/api.log)",
       "Bash(git stash *)",
       "Bash(curl -s http://localhost:4000/api/ingestion/jobs/19097ab2-4861-43ab-88dd-f528811b973b)",
-      "Bash(python3 -m json.tool)"
+      "Bash(python3 -m json.tool)",
+      "Bash(xargs grep -liE \"bullmq|queue\")",
+      "Bash(where poppler *)",
+      "Bash(choco list *)",
+      "Bash(winget list *)",
+      "Bash(node \"C:/Users/SYS2/AppData/Local/Temp/claude/D--Aditya-BBDS-AI-Email-Outreach-Automation-Agent-main/edcac874-d43f-408e-bf4a-99fb30a71636/scratchpad/extract_pdf_text.mjs\")",
+      "Bash(git -C \"D:\\\\Aditya BBDS\\\\AI-Email-Outreach-Automation-Agent-main\" diff -- Frontend/app/leads/page.tsx)",
+      "Bash(powershell -Command \"Get-Process -Id 15472 | Select-Object Id,ProcessName,Path,StartTime\")",
+      "Bash(powershell -Command \"Stop-Process -Id 15472 -Force\")",
+      "Bash(node -e \"console.log\\(require\\('crypto'\\).randomBytes\\(32\\).toString\\('hex'\\)\\)\")",
+      "Bash(powershell -Command \"Get-NetTCPConnection -LocalPort 4000 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1 OwningProcess\")"
     ]
   }
 }

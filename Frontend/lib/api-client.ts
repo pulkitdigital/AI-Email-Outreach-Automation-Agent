@@ -26,6 +26,10 @@ export class ApiError extends Error {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
+    // Backend (Render) and Frontend (Vercel) are different domains in production — the session
+    // cookie only gets sent/accepted cross-site with credentials explicitly opted into on every
+    // request. See Backend/src/modules/auth/authService.ts for the matching cookie config.
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
   });
 
@@ -65,7 +69,11 @@ export async function uploadIngestionFile(file: File): Promise<{ jobId: string }
   const formData = new FormData();
   formData.append('file', file);
 
-  const res = await fetch(`${API_BASE}/api/ingestion/upload`, { method: 'POST', body: formData });
+  const res = await fetch(`${API_BASE}/api/ingestion/upload`, {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  });
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as { error?: string } | null;
     throw new ApiError(body?.error ?? `Upload failed (${res.status})`, res.status);
@@ -294,5 +302,49 @@ export function sendWhatsAppMessage(
   return request(`/api/leads/${leadId}/whatsapp/send`, {
     method: 'POST',
     body: JSON.stringify(input),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
+
+export interface AuthMeResponse {
+  authenticated: boolean;
+}
+
+export function getAuthMe(): Promise<AuthMeResponse> {
+  return request('/api/auth/me');
+}
+
+export function login(email: string, password: string): Promise<{ authenticated: boolean }> {
+  return request('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export function logout(): Promise<{ status: string }> {
+  return request('/api/auth/logout', { method: 'POST' });
+}
+
+// ---------------------------------------------------------------------------
+// Settings
+// ---------------------------------------------------------------------------
+
+export interface SchedulerCronResponse {
+  cron: string;
+}
+
+export function getSchedulerCron(): Promise<SchedulerCronResponse> {
+  return request('/api/settings/scheduler-cron');
+}
+
+export function updateSchedulerCron(
+  cron: string,
+): Promise<SchedulerCronResponse & { status: string }> {
+  return request('/api/settings/scheduler-cron', {
+    method: 'PUT',
+    body: JSON.stringify({ cron }),
   });
 }

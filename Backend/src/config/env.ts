@@ -146,6 +146,12 @@ const envSchema = z.object({
   // the Vercel production URL here once Frontend is deployed (see .env.example's comment).
   ALLOWED_ORIGINS: z.string().default('http://localhost:3000'),
 
+  // Single hardcoded admin account — no users table (see routes/auth.ts). Required at boot since
+  // an auth system with an unset password would silently lock everyone out or accept anything.
+  ADMIN_EMAIL: z.string().min(1, 'ADMIN_EMAIL is required'),
+  ADMIN_PASSWORD: z.string().min(1, 'ADMIN_PASSWORD is required'),
+  JWT_SECRET: z.string().min(16, 'JWT_SECRET is required (min 16 chars)'),
+
   // WhatsApp channel (Meta WhatsApp Cloud API) — see shared/src/types/whatsapp.ts and
   // Backend/src/providers/whatsapp/. All optional at boot (unlike EMAIL_PROVIDER, there's no
   // WHATSAPP_PROVIDER switch yet — Meta Cloud is the only implementation) — checked at point of

@@ -4,11 +4,15 @@
  * numeral in the corner — verified present in the reference deck's own card design (each benefit
  * is numbered there too), not an invented addition.
  *
- * PERSONALIZED: the 2-3 benefits most relevant to the lead's primary category (see
- * staticContent.ts's HOW_CAN_WE_HELP_BY_CATEGORY) are moved to the front via orderBenefitsForLead()
+ * PERSONALIZED: the 2-3 benefits most relevant to the lead's primary category (DB-sourced via
+ * ctx.howCanWeHelpByCategory — category_content, see pdf/generateDeckPdf.ts's
+ * loadDeckContentFromDb; the legacy staticContent.ts HOW_CAN_WE_HELP_BY_CATEGORY it replaces stays
+ * in place unused, pending a later cleanup pass) are moved to the front via orderBenefitsForLead()
  * and given a lighter "FOR YOU" highlight treatment — mirroring the Our Services slide's
  * "Recommended For You" personalization, scoped down to fit an 8-card grid instead of a 4-item
- * list (a badge above every highlighted card here would be too busy).
+ * list (a badge above every highlighted card here would be too busy). HOW_CAN_WE_HELP itself (the
+ * flat, category-independent list of all 8 possible labels) stays imported from staticContent.ts
+ * — it isn't per-category data, so it has no row in category_content to migrate to.
  */
 import { Page, Text, View } from '@react-pdf/renderer';
 import { IconBadge, SlideBody, SlideTitle } from '../components.js';
@@ -22,7 +26,7 @@ import {
   TrendUpIcon,
   TrophyIcon,
 } from '../icons.js';
-import { HOW_CAN_WE_HELP, HOW_CAN_WE_HELP_BY_CATEGORY, orderBenefitsForLead } from '../../staticContent.js';
+import { HOW_CAN_WE_HELP, orderBenefitsForLead } from '../../staticContent.js';
 import type { DeckContext } from '../../types.js';
 import { CARD_GAP, COLORS, FONT_HEADING, PAGE_HEIGHT, PAGE_MARGIN, PAGE_WIDTH, SPACING } from '../theme.js';
 
@@ -43,9 +47,9 @@ const COLUMNS = 4;
 
 export function HowCanWeHelpSlide({ ctx }: { ctx: DeckContext }) {
   const cardWidth = (PAGE_WIDTH - 2 * PAGE_MARGIN - (COLUMNS - 1) * CARD_GAP.md) / COLUMNS;
-  const ordered = orderBenefitsForLead(HOW_CAN_WE_HELP, ctx.primaryCategorySlug);
+  const ordered = orderBenefitsForLead(HOW_CAN_WE_HELP, ctx.primaryCategorySlug, ctx.howCanWeHelpByCategory);
 
-  const relevant = ctx.primaryCategorySlug ? (HOW_CAN_WE_HELP_BY_CATEGORY[ctx.primaryCategorySlug] ?? []) : [];
+  const relevant = ctx.primaryCategorySlug ? (ctx.howCanWeHelpByCategory[ctx.primaryCategorySlug] ?? []) : [];
   const highlightedLabels = new Set(relevant.filter((label) => HOW_CAN_WE_HELP.includes(label)));
 
   return (

@@ -233,6 +233,20 @@ export function useOptInLeadForWhatsApp(leadId: string) {
   });
 }
 
+export function useSchedulerCron() {
+  return useQuery({ queryKey: ['schedulerCron'], queryFn: api.getSchedulerCron });
+}
+
+export function useUpdateSchedulerCron() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (cron: string) => api.updateSchedulerCron(cron),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['schedulerCron'] });
+    },
+  });
+}
+
 export function useSendWhatsAppMessage(leadId: string) {
   const queryClient = useQueryClient();
   return useMutation({
